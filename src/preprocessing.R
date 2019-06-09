@@ -31,3 +31,10 @@ all_data_cleaned <- all_data_cleaned %>%
 
 # b <- b %>% 
 #   separate(date, into = c("game_date", "start_time"), sep = " ")
+
+
+
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(attendance = sub(",", "", attendance) %>% as.numeric())
+
+
