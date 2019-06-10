@@ -58,6 +58,9 @@ for(i in 1:length(seasons)) {
   
   
   all_data <- rbind(all_data, season_data)
-  
-  
+
 }
+
+
+saveRDS(all_data, "data/afl_games.rds")
+
