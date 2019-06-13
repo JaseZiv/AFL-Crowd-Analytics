@@ -68,6 +68,9 @@ all_data_cleaned <- all_data_cleaned %>%
 
 
 
+all_data_cleaned %>% glimpse()
+
+
 all_data_cleaned %>% 
   count(winner) %>% 
   mutate(prop = n / sum(n))
@@ -94,4 +97,21 @@ all_data_cleaned %>%
 
 
 
+all_data_cleaned %>% 
+  filter(round <= 11) %>% 
+  group_by(season) %>% 
+  summarise(median_attendance = median(attendance)) %>% 
+  ggplot(aes(x= season)) +
+  geom_line(aes(y= median_attendance))
 
+
+
+
+
+
+all_data_cleaned %>% 
+  filter(round <= 11) %>% 
+  group_by(season) %>% 
+  summarise(avg_total_score = mean(total_score)) %>% 
+  ggplot(aes(x= season)) +
+  geom_line(aes(y= avg_total_score))
