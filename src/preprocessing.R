@@ -64,9 +64,24 @@ all_data_cleaned <- all_data_cleaned %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(margin = team1_score - team2_score,
          total_score = team1_score + team2_score,
-         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw")))
+         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw"))) %>% 
+  mutate_if(is.character, str_squish)
 
 
+
+rain_data <- read_csv("data/cleaned_data/preprocessed_rain_data.csv")
+
+all_data_cleaned %>% count(venue) %>% View()
+
+VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Hobart")
+Venue <- all_data_cleaned %>% count(venue) %>% pull(venue)
+
+venues_df <- cbind(Venue, VenueCity) %>% data.frame() %>% mutate_if(is.factor, as.character)
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#---------- ANALYSIS ----------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 all_data_cleaned %>% glimpse()
 
