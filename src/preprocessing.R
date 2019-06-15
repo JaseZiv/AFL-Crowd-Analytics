@@ -1,10 +1,7 @@
 library(rvest)
 library(httr)
-library(dplyr)
-library(stringr)
-library(tidyr)
 library(lubridate)
-library(ggplot2)
+library(tidyverse)
 
 
 all_data <- readRDS("data/afl_games.rds")
@@ -69,14 +66,53 @@ all_data_cleaned <- all_data_cleaned %>%
 
 
 
-rain_data <- read_csv("data/cleaned_data/preprocessed_rain_data.csv")
-
 all_data_cleaned %>% count(venue) %>% View()
 
 VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Hobart")
-Venue <- all_data_cleaned %>% count(venue) %>% pull(venue)
+venue <- all_data_cleaned %>% count(venue) %>% pull(venue)
 
-venues_df <- cbind(Venue, VenueCity) %>% data.frame() %>% mutate_if(is.factor, as.character)
+venues_df <- cbind(venue, VenueCity) %>% data.frame() %>% mutate_if(is.factor, as.character)
+
+
+
+
+# Read in Rain Data -------------------------------------------------------
+
+rain_data <- read_csv("data/cleaned_data/preprocessed_rain_data.csv")
+
+glimpse(rain_data)
+
+table(rain_data$location)
+
+rain_data$location[rain_data$location == "adl"] <- "Adelaide"
+rain_data$location[rain_data$location == "brs"] <- "Brisbane"
+rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
+rain_data$location[rain_data$location == "melb"] <- "Melbourne"
+rain_data$location[rain_data$location == "perth"] <- "Perth"
+rain_data$location[rain_data$location == "syd"] <- "Sydney"
+rain_data$location[rain_data$location == "tas"] <- "Tasmania"
+
+
+# select only required variables
+rain_data <- rain_data %>% 
+  select(weather_date, rainfall_ml = `Rainfall amount (millimetres)`, days_rainfall_measured = `Period over which rainfall was measured (days)`, Quality, VenueCity = location, actual_days_rain)
+
+
+test <- all_data_cleaned %>% 
+  left_join(venues_df, by = "venue") %>% 
+  left_join(rain_data, by = c("date" = "weather_date", "VenueCity"))
+
+colSums(is.na(test))
+
+
+test %>% group_by(VenueCity) %>% 
+  summarise(n_games = n(), 
+            n_missing_weather = sum(is.na(actual_days_rain)), 
+            med_rainfall = median(actual_days_rain, na.rm = T),
+            rain_games = sum(actual_days_rain > 1, na.rm = T))
+
+
+test %>% filter(actual_days_rain > 0) %>% ggplot(aes(x=1, y=actual_days_rain)) + geom_boxplot()
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -130,3 +166,10 @@ all_data_cleaned %>%
   summarise(avg_total_score = mean(total_score)) %>% 
   ggplot(aes(x= season)) +
   geom_line(aes(y= avg_total_score))
+
+
+
+
+all_data_cleaned %>% ggplot() +
+  geom_density(aes(x=team1_score), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x= team2_score), fill = "green", alpha = 0.5)
