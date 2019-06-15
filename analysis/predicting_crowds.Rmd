@@ -18,6 +18,15 @@ afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
 
 
 
+```{r}
+fit_lm <- lm(attendance ~ team1 + team2 + round + venue + start_time, data = afl)
+
+summary(fit_lm)
+```
+
+
+
+
 
 ```{r}
 afl %>% filter(season > 2013) %>% View()
