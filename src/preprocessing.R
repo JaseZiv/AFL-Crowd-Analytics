@@ -1,10 +1,7 @@
 library(rvest)
 library(httr)
-library(dplyr)
-library(stringr)
-library(tidyr)
 library(lubridate)
-library(ggplot2)
+library(tidyverse)
 
 
 all_data <- readRDS("data/afl_games.rds")
@@ -64,33 +61,85 @@ all_data_cleaned <- all_data_cleaned %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(margin = team1_score - team2_score,
          total_score = team1_score + team2_score,
-         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw")))
+         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw"))) %>% 
+  mutate_if(is.character, str_squish)
+
+
+VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Hobart")
+venue <- all_data_cleaned %>% count(venue) %>% pull(venue)
+
+venues_df <- cbind(venue, VenueCity) %>% data.frame() %>% mutate_if(is.factor, as.character)
+
+rm(all_data);gc()
+
+# join to the full DF
+all_data_cleaned <- all_data_cleaned %>% 
+  left_join(venues_df, by = "venue")
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Read in Rain Data -------------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+rain_data <- read_csv("data/cleaned_data/preprocessed_rain_data.csv") %>% data.frame()
+
+
+rain_data$location[rain_data$location == "adl"] <- "Adelaide"
+rain_data$location[rain_data$location == "brs"] <- "Brisbane"
+rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
+rain_data$location[rain_data$location == "melb"] <- "Melbourne"
+rain_data$location[rain_data$location == "perth"] <- "Perth"
+rain_data$location[rain_data$location == "syd"] <- "Sydney"
+rain_data$location[rain_data$location == "tas"] <- "Tasmania"
+
+
+# select only required variables
+rain_data <- rain_data %>% 
+  select(weather_date, rainfall_ml = `Rainfall.amount..millimetres.`, days_rainfall_measured = `Period.over.which.rainfall.was.measured..days.`, Quality, VenueCity = location, actual_days_rain)
+
+
+# Join back to main df
+all_data_cleaned <- all_data_cleaned %>% 
+  left_join(rain_data, by = c("date" = "weather_date", "VenueCity"))
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# AFL Betting Data --------------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# read in function to get and clean betting data from web
+source("R/return_betting_data.R")
+
+# create betting data DF
+betting_data <- return_betting_data()
+
+# Need to make joinging data possible, so will need to change GWS Giants to "Greater Western Sydney"
+betting_data <- betting_data %>% 
+  mutate(HomeTeam = ifelse(HomeTeam == "GWS Giants", "Greater Western Sydney", HomeTeam),
+         AwayTeam = ifelse(AwayTeam == "GWS Giants", "Greater Western Sydney", AwayTeam)) %>% 
+  mutate(HomeTeam = ifelse(HomeTeam == "Brisbane", "Brisbane Lions", HomeTeam),
+         AwayTeam = ifelse(AwayTeam == "Brisbane", "Brisbane Lions", AwayTeam)) %>% 
+  mutate(GameID = paste(Date, HomeTeam, AwayTeam, sep = "-"))
+
+
+# create a GamiID varibale for joining and join betting data to main DF
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(GameID = paste(date, team1, team2, sep = "-")) %>% 
+  left_join(betting_data, by = "GameID")
 
 
 
-all_data_cleaned %>% 
-  count(winner) %>% 
-  mutate(prop = n / sum(n))
+# Save Data For Analysis --------------------------------------------------
+
+saveRDS(all_data_cleaned, "data/cleaned_data/game_weather_betting_data.rds")
 
 
-all_data_cleaned %>% 
-  mutate(margin = abs(margin)) %>% 
-  ggplot(aes(x= margin)) +
-  geom_density()
 
 
-summary(abs(all_data_cleaned$margin))
 
 
-mosaic::favstats(abs(all_data_cleaned$margin) ~ all_data_cleaned$season)
 
 
-all_data_cleaned %>% 
-  group_by(season) %>% 
-  summarise(median_margin = median(abs(margin)),
-            avg_margin = mean(abs(margin))) %>% 
-  ggplot(aes(x= season)) +
-  geom_line(aes(y= median_margin))
 
 
 

@@ -1,0 +1,136 @@
+---
+title: "Predicting AFL Crowds"
+author: "Jason Zivkovic"
+date: "15/06/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
+```
+
+
+
+
+
+```{r}
+afl %>% filter(season > 2013) %>% View()
+```
+
+
+
+
+```{r}
+mcg <- afl %>% filter(venue == "M.C.G.") %>% filter(!str_detect(round, "Final"))
+
+
+fit.lm <- lm(attendance ~ abs(HomeLineClose), data = mcg)
+summary(fit.lm)
+
+
+fit.lm <- lm(attendance ~ abs(HomeOdds - AwayOdds), data = mcg)
+summary(fit.lm)
+
+
+
+fit.lm <- lm(total_score ~ actual_days_rain, data = mcg)
+summary(fit.lm)
+
+```
+
+
+
+```{r}
+mfc <- afl %>% filter(str_detect(team1, "Melbourne") | str_detect(team2, "Melbourne")) %>% filter(venue == "M.C.G.") %>% filter(!str_detect(round, "Final"))
+
+
+mfc <- mfc %>% mutate(rain_day = ifelse(actual_days_rain >= 10, "Rain", "Dry"))
+
+fit_mfc <- lm(attendance ~ rain_day, data = mfc)
+summary(fit_mfc)
+
+
+mfc %>% count(rain_day)
+
+```
+
+
+
+
+
+
+```{r}
+afl %>% group_by(VenueCity) %>% 
+  summarise(n_games = n(), 
+            n_missing_weather = sum(is.na(actual_days_rain)), 
+            med_rainfall = median(actual_days_rain, na.rm = T),
+            rain_games = sum(actual_days_rain > 1, na.rm = T))
+
+
+afl %>% filter(actual_days_rain > 0) %>% ggplot(aes(x=1, y=actual_days_rain)) + geom_boxplot()
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#---------- ANALYSIS ----------#
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+afl %>% 
+  count(winner) %>% 
+  mutate(prop = n / sum(n))
+
+
+all_data_cleaned %>% 
+  mutate(margin = abs(margin)) %>% 
+  ggplot(aes(x= margin)) +
+  geom_density()
+
+
+summary(abs(all_data_cleaned$margin))
+
+
+mosaic::favstats(abs(all_data_cleaned$margin) ~ all_data_cleaned$season)
+
+
+all_data_cleaned %>% 
+  group_by(season) %>% 
+  summarise(median_margin = median(abs(margin)),
+            avg_margin = mean(abs(margin))) %>% 
+  ggplot(aes(x= season)) +
+  geom_line(aes(y= median_margin))
+
+
+
+all_data_cleaned %>% 
+  filter(round <= 11) %>% 
+  group_by(season) %>% 
+  summarise(median_attendance = median(attendance)) %>% 
+  ggplot(aes(x= season)) +
+  geom_line(aes(y= median_attendance))
+
+
+
+
+
+
+all_data_cleaned %>% 
+  filter(round <= 11) %>% 
+  group_by(season) %>% 
+  summarise(avg_total_score = mean(total_score)) %>% 
+  ggplot(aes(x= season)) +
+  geom_line(aes(y= avg_total_score))
+
+
+
+
+all_data_cleaned %>% ggplot() +
+  geom_density(aes(x=team1_score), fill = "blue", alpha = 0.5) +
+  geom_density(aes(x= team2_score), fill = "green", alpha = 0.5)
+
+```
+
