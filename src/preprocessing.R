@@ -41,15 +41,17 @@ all_data_cleaned <- all_data_cleaned %>%
   separate(date, into = c("date", NA), sep = "\\(") 
 # remove the day of week from the date variable - this can always be added in using the lubridate package
 all_data_cleaned <- all_data_cleaned %>% 
-  separate(date, into = c(NA, "date"), sep = ", ")
+  separate(date, into = c("weekday", "date"), sep = ", ")
 # split out the date variable to separate variables for date and time
 all_data_cleaned <- all_data_cleaned %>% 
-  separate(date, into = c("date", "start_time"), sep = " ")
+  separate(date, into = c("date", "start_time", "am_pm"), sep = " ")
 
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(date = ymd(as.Date(date, format="%d-%B-%Y")))
 
 
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate_if(is.character, str_squish)
 
 # Feature Engineering -----------------------------------------------------
 
@@ -57,12 +59,16 @@ all_data_cleaned <- all_data_cleaned %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(season = year(date))
 
+# create a variable for period in the day - afternoon, evening, night
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(start_hour = ifelse(am_pm == "PM" & as.numeric(sub("\\:.*", "", start_time)) < 12, as.numeric(sub("\\:.*", "", start_time)) + 12, as.numeric(sub("\\:.*", "", start_time)))) %>% 
+  mutate(time_period = ifelse(between(start_hour, 11, 16), "Afternoon", ifelse(between(start_hour, 17, 18), "Evening", "Night")))
+
 # create a variable that calculates the margin, total combined score and whether the home team won (team_1)
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(margin = team1_score - team2_score,
          total_score = team1_score + team2_score,
-         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw"))) %>% 
-  mutate_if(is.character, str_squish)
+         winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw"))) 
 
 
 VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Hobart")
@@ -126,7 +132,6 @@ betting_data <- betting_data %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(GameID = paste(date, team1, team2, sep = "-")) %>% 
   left_join(betting_data, by = "GameID")
-
 
 
 # Save Data For Analysis --------------------------------------------------
