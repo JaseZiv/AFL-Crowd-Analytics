@@ -96,7 +96,8 @@ rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
 rain_data$location[rain_data$location == "melb"] <- "Melbourne"
 rain_data$location[rain_data$location == "perth"] <- "Perth"
 rain_data$location[rain_data$location == "syd"] <- "Sydney"
-rain_data$location[rain_data$location == "tas"] <- "Tasmania"
+rain_data$location[rain_data$location == "tas"] <- "Hobart"
+rain_data$location[rain_data$location == "gee"] <- "Geelong"
 
 
 # select only required variables
