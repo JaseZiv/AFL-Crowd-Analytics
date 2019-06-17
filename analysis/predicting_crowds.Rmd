@@ -13,16 +13,71 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
+
+afl_pre_2019 <- afl %>% filter(season < 2019) %>% filter(!str_detect(round, "Final"))
+
+afl_pre_2019 <- afl_pre_2019 %>% mutate(odds_diff = abs(HomeOdds - AwayOdds),
+                                        rain = ifelse(actual_days_rain > 2, "Yes", "No"),
+                                        HomeTeamFav = ifelse(HomeOdds > AwayOdds, "Yes", "No"))
+
 ```
 
 
-
+The baseline model using OLS, with team1 + team2 + round + venue + start_time as the independant variables is below. The model explains 73% of the variability in crowds. Let's see if this can improve.
 
 ```{r}
-fit_lm <- lm(attendance ~ team1 + team2 + round + venue + start_time, data = afl)
+fit_lm <- lm(attendance ~ team1 + team2 + round + venue + start_time, data = afl_pre_2019)
 
 summary(fit_lm)
 ```
+
+
+By using the day of the week the game was played and whether it was a day, evening or night game, the variation explained has been able to increase to 74%.
+```{r}
+fit_lm2 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period, data = afl_pre_2019)
+
+summary(fit_lm2)
+
+```
+
+
+
+The R^2 of the model increases to 79% when the difference between the home and away team's opening head-to-head odds, the closing line of the game and whether there was more than 2ml of rain.
+```{r}
+fit_lm3 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + rain, data = afl_pre_2019)
+
+summary(fit_lm3)
+
+```
+
+
+```{r}
+fit_lm4 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + rain + HomeTeamFav, data = afl_pre_2019)
+
+summary(fit_lm4)
+
+
+```
+
+
+
+Including a variable for rivalry game and removing the "rain" variable sees the model's explainability increase to 82%...
+
+```{r}
+fit_lm5 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + HomeTeamFav + rivalry_game, data = afl_pre_2019)
+
+summary(fit_lm5)
+
+
+```
+
+
+
+
+
+
+
+
 
 
 
@@ -35,47 +90,13 @@ afl %>% filter(season > 2013) %>% View()
 
 
 
-```{r}
-mcg <- afl %>% filter(venue == "M.C.G.") %>% filter(!str_detect(round, "Final"))
-
-
-fit.lm <- lm(attendance ~ abs(HomeLineClose), data = mcg)
-summary(fit.lm)
-
-
-fit.lm <- lm(attendance ~ abs(HomeOdds - AwayOdds), data = mcg)
-summary(fit.lm)
-
-
-
-fit.lm <- lm(total_score ~ actual_days_rain, data = mcg)
-summary(fit.lm)
-
-```
-
-
-
-```{r}
-mfc <- afl %>% filter(str_detect(team1, "Melbourne") | str_detect(team2, "Melbourne")) %>% filter(venue == "M.C.G.") %>% filter(!str_detect(round, "Final"))
-
-
-mfc <- mfc %>% mutate(rain_day = ifelse(actual_days_rain >= 10, "Rain", "Dry"))
-
-fit_mfc <- lm(attendance ~ rain_day, data = mfc)
-summary(fit_mfc)
-
-
-mfc %>% count(rain_day)
-
-```
-
 
 
 
 
 
 ```{r}
-afl %>% group_by(VenueCity) %>% 
+afl_pre_2019 %>% group_by(VenueCity) %>% 
   summarise(n_games = n(), 
             n_missing_weather = sum(is.na(actual_days_rain)), 
             med_rainfall = median(actual_days_rain, na.rm = T),
