@@ -135,6 +135,20 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(betting_data, by = "GameID")
 
 
+melbourne_rivals <- c("Carlton", "Collingwood", "Essendon", "Richomond")
+
+
+
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(rivalry_game = ifelse(team1 %in% c("West Coast", "Fremantle") & team2 %in% c("West Coast", "Fremantle"), "Rivalry",
+                       ifelse(team1 %in% c("Adelaide", "Port Adelaide") & team2 %in% c("Adelaide", "Port Adelaide"), "Rivalry", 
+                              ifelse(team1 %in% c("Hawthorn", "Geelong") & team2 %in% c("Hawthorn", "Geelong"), "Rivalry",
+                                     ifelse(team1 %in% melbourne_rivals & team2 %in% melbourne_rivals, "Rivalry", "Normal")))))
+
+
+
+
+
 # Save Data For Analysis --------------------------------------------------
 
 saveRDS(all_data_cleaned, "data/cleaned_data/game_weather_betting_data.rds")
