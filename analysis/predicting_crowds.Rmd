@@ -7,20 +7,135 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+
+theme_set(theme_minimal() +
+            theme(panel.grid = element_blank(),
+                  plot.title = element_text(size = 18, colour = "darkred"),
+                  axis.title.x = element_text(size = 14, colour = "darkred", hjust = 1),
+                  axis.title.y = element_text(size = 14, colour = "darkred", hjust = 1, angle = 360)))
+
+library(tidyverse)
+library(scales)
+```
+
+
+```{r}
+afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
+```
+
+
+# Introduction
+
+There is a lot of talk about crowd behaviour and crowd issues with the modern day AFL. I personally feel the crowd issues are a case of *business-as-usual*; I've been going to AFL games on-and-off for close to three decades and the crowd behaviour is no different today as it was 20 years ago... just now everyone with a phone and Twitter account is a journo.
+
+Anyway, that's my two cents worth. This analysis is not on crowd behaviour. This but is primarily concerned with building a model to predict AFL crowds during the season proper. The model will be bult on data from the last 10 years, as betting data was only available since then. The analysis however will be based on the last 20 years worth of games.
+
+
+```{r}
+afl %>% ggplot(aes(x=attendance)) +
+  geom_histogram(colour = "midnightblue", fill = "lightgrey") +
+  scale_x_continuous(labels = comma, name = "Attendance") +
+  labs(y= "Number\nof Games", title = "SOME GAMES DO DRAW SOME LARGE CROWDS") +
+  geom_vline(xintercept = median(afl$attendance), linetype = 2, colour = "darkred", size = 1) +
+  geom_text(aes(label = paste0("Median Crowd: ", comma(median(afl$attendance))), x= median(afl$attendance) + 15000), y= 350, colour = "darkred") +
+  ylim(0,400) +
+  theme(panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
+  
+  
+```
+
+Over the last 20 years, the median (the 50% mark and a better measure than the average on skewed data) crowd to AFL games was just over 33,500.
+
+## The Data
+Data was collected from a few different online sources. The game and attendance data was sourced from the amazing [AFL Tables](https://afltables.com), while the betting data was sourced from the [Australian Sports Betting](http://www.aussportsbetting.com) website. 
+
+
+
+# Feature Engineering
+
+The data contained at AFL Tables is a rich source of information, but some steps were needed to glean some additional information from the data. 
+
+## Game Time
+
+Take the game start time as an example - having the time is great, but a regression model may find it better to reclassify the time to a period of the day to reduce some of the noise. So, with that in mind, a feature (*time_period*) was created - if the game started by 5pm, I have classified it as an afternoon game. Games started between 5pm-7pm were classified as evening games, while games later than this were night games.
+
+```{r}
+afl %>% count(time_period) %>% 
+  ggplot(aes(x= reorder(time_period, n), y= n)) + 
+  geom_col(fill = "lightgrey", colour = "midnightblue") + 
+  ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
+  geom_text(aes(label = comma(n)), hjust = 1, size = 9, colour = "darkred") +
+  coord_flip() +
+  theme(axis.title.x = element_blank(), axis.text = element_blank(), axis.title.y = element_blank())
+```
+
+Additionally, the day of the week and the *time_period* were joined into one variable to use in the model. For example, if it was a Saturday game starting at 5:30pm, it was classified as "Sat-Evening". 
+
+```{r}
+afl %>% count(game_time) %>% 
+  ggplot(aes(x= reorder(game_time, n), y= n)) + 
+  geom_col(fill = "lightgrey", colour = "midnightblue") + 
+  ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
+  geom_text(aes(label = comma(n)), hjust = 1, size = 9, colour = "darkred") +
+  coord_flip() +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
+```
+
+
+
+## Rivalries
+
+Another feature was created to determine rivalry games - the thinking being that when two fierce rivals face off against each other, the crowds will come.
+
+To be a rivalry, a few different options existed. The first contains the four oldest, traditional rivals, all from Melbourne - Collingwood, Richmond, Essendon and Carlton (hold your Carlton opinions, I know they've been horrible but their fans still turn up to these rivalry games). The Derby in SA (*The Showdown* between Adelaide and Port Adelaide) and in WA (*Western Derby* between West Coast and Fremantle) are also classed as rivalry games, as is the game between the mighty Hawthorn Hawks and the Geelong Cats.
+
+
+## Betting Odds
+
+Betting data collected started in 2009 and appears to be a rich source of information on where the two team's are at for each game. I dare say it's a good predictor of game results...but that's not the purpose of this analysis.
+
+I feel like it would also be a good predictor of whether fans will turn up to games (ok, maybe I heard a talk from a key AFL staffer discussing this), so have gone out and collected some betting data. The difference between the head-to-head odds was calculated to use as a feature.
+
+Another betting odds feature was created to indicate whether the home team was the favourite. The thinking being that members of the home team would be more likely to attend if their team had a chance in the eyes of the betting agencies (and our collective hearts).
+
+
+
+
+
+
+
+
+
+
+
+# FEATURES TO EXPLORE / CREATE
+
+* did the home team win last week?
+* how many games are there in the round (ie was it a split round / byes)?
+* what was the team's winning percentage leading in to the game?
+* get ticket pricing per season if possible
+
+
+
+
+
+
+```{r}
+
+afl_pre_2019 <- afl %>% filter(season < 2019) %>% filter(!str_detect(round, "Final"))
+
+# afl_pre_2019 <- afl_pre_2019 %>% mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
+#                                         rain = ifelse(actual_days_rain > 2, "Yes", "No"),
+#                                         HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
+
 ```
 
 
 
 ```{r}
-afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
-
-afl_pre_2019 <- afl %>% filter(season < 2019) %>% filter(!str_detect(round, "Final"))
-
-afl_pre_2019 <- afl_pre_2019 %>% mutate(odds_diff = abs(HomeOdds - AwayOdds),
-                                        rain = ifelse(actual_days_rain > 2, "Yes", "No"),
-                                        HomeTeamFav = ifelse(HomeOdds > AwayOdds, "Yes", "No"))
-
+afl %>% ggplot(aes(x=log(attendance))) + geom_histogram()
 ```
+
 
 
 The baseline model using OLS, with team1 + team2 + round + venue + start_time as the independant variables is below. The model explains 73% of the variability in crowds. Let's see if this can improve.
@@ -66,14 +181,56 @@ Including a variable for rivalry game and removing the "rain" variable sees the 
 ```{r}
 fit_lm5 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + HomeTeamFav + rivalry_game, data = afl_pre_2019)
 
-summary(fit_lm5)
+# summary(fit_lm5)
 
+
+
+fit_lm6 <- lm(attendance ~ team1 + team2 + round + venue + game_time + odds_diff + HomeTeamFav + rivalry_game, data = afl_pre_2019)
+
+summary(fit_lm6)
+
+plot(fit_lm6)
 
 ```
 
 
 
 
+# fit model
+
+```{r}
+afl_2019 <- afl %>% filter(season == 2019) %>% filter(GameID != '2019-04-24-Richmond-Melbourne')
+
+actual_2019crowds <- afl_2019$attendance
+
+afl_2019 <- afl_2019 %>% select(-attendance) 
+
+
+
+# fit linear model 6
+afl_2019$predicted_attendance <- predict(fit_lm6, afl_2019)
+
+afl_2019$attendance <- actual_2019crowds
+
+error <- afl_2019$predicted_attendance - afl_2019$attendance
+
+sqrt(mean(error^2))
+
+
+afl_2019 %>% 
+  ggplot(aes(x=attendance, y= predicted_attendance)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept=0)
+
+
+afl_2019 %>% 
+  ggplot(aes(x=attendance, y= predicted_attendance)) +
+  geom_point() +
+  geom_smooth(method = "lm")
+
+
+
+```
 
 
 
