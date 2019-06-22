@@ -135,10 +135,16 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(betting_data, by = "GameID")
 
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Feature Engineering -----------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# theses four Melbourne-based teams are traditional rivals - I will flag games played between them as rivalry games
 melbourne_rivals <- c("Carlton", "Collingwood", "Essendon", "Richomond")
 
 
-
+# also, the derby in bith SA and WA are fierce rivalries, as is Hawthorn v Geelong games
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(rivalry_game = ifelse(team1 %in% c("West Coast", "Fremantle") & team2 %in% c("West Coast", "Fremantle"), "Rivalry",
                        ifelse(team1 %in% c("Adelaide", "Port Adelaide") & team2 %in% c("Adelaide", "Port Adelaide"), "Rivalry", 
@@ -146,7 +152,16 @@ all_data_cleaned <- all_data_cleaned %>%
                                      ifelse(team1 %in% melbourne_rivals & team2 %in% melbourne_rivals, "Rivalry", "Normal")))))
 
 
+# Here is some betting features engineering. 
+# 1. get the absolute difference between the 
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
+         rain = ifelse(actual_days_rain > 2, "Yes", "No"),
+         HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
+
+all_data_cleaned <- all_data_cleaned %>% 
+  mutate(game_time = paste(weekday, time_period, sep = ' '))
 
 
 # Save Data For Analysis --------------------------------------------------
