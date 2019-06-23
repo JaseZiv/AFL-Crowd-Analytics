@@ -180,9 +180,9 @@ last_weeks_result <- last_weeks_result %>% filter(!str_detect(round, "Final")) %
 # determine whether the team won or lost
 last_weeks_result <- last_weeks_result %>% arrange(team, season, round) %>% mutate(result = ifelse(winner == home_or_away_team, "Won", "Lost"), round = as.character(round))
 # use lag to calculate the result from the previous week
-last_weeks_result <- last_weeks_result %>% group_by(team, season) %>% mutate(last_result = lag(result)) %>% ungroup()
-# round 1 games will not have a previous week, so just flag this
-last_weeks_result <- last_weeks_result %>% mutate(last_result = ifelse(is.na(last_result), "Round 1", last_result))
+last_weeks_result <- last_weeks_result %>% group_by(team) %>% mutate(last_result = lag(result)) %>% ungroup()
+# # round 1 games will not have a previous week, so just flag this
+# last_weeks_result <- last_weeks_result %>% mutate(last_result = ifelse(is.na(last_result), "Round 1", last_result))
 
 # now join back to the main dataset
 all_data_cleaned <- all_data_cleaned %>%
