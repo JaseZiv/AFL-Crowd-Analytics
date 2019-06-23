@@ -152,20 +152,61 @@ all_data_cleaned <- all_data_cleaned %>%
                                      ifelse(team1 %in% melbourne_rivals & team2 %in% melbourne_rivals, "Rivalry", "Normal")))))
 
 
-# Here is some betting features engineering. 
-# 1. get the absolute difference between the 
+# calculate the odds differences, if it rained or not, and whether the home team is the favourite
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
          rain = ifelse(actual_days_rain > 2, "Yes", "No"),
          HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
-
+# join the day of week the game is played and the time period it's played in
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(game_time = paste(weekday, time_period, sep = ' '))
 
 
-# Save Data For Analysis --------------------------------------------------
 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Calculating The Team's Prior Result -------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# to do this, the team's need to be in the one column, and need to indicate whether the team is the home or away team
+last_weeks_result <- bind_rows(all_data_cleaned %>% select(team = team1, round, season, winner) %>% mutate(home_or_away_team = "Home"),
+                  all_data_cleaned %>% select(team = team2, round, season, winner) %>% mutate(home_or_away_team = "Away"))
+
+# filter out the finals series games
+last_weeks_result <- last_weeks_result %>% filter(!str_detect(round, "Final")) %>% mutate(round = as.numeric(round))
+# determine whether the team won or lost
+last_weeks_result <- last_weeks_result %>% arrange(team, season, round) %>% mutate(result = ifelse(winner == home_or_away_team, "Won", "Lost"), round = as.character(round))
+# use lag to calculate the result from the previous week
+last_weeks_result <- last_weeks_result %>% group_by(team, season) %>% mutate(last_result = lag(result)) %>% ungroup()
+# round 1 games will not have a previous week, so just flag this
+last_weeks_result <- last_weeks_result %>% mutate(last_result = ifelse(is.na(last_result), "Round 1", last_result))
+
+# now join back to the main dataset
+all_data_cleaned <- all_data_cleaned %>%
+  left_join(last_weeks_result %>% select(team, season, round, last_result), by = c("team1" = "team", "season", "round")) %>% rename(team1_last_result = last_result) %>% 
+  left_join(last_weeks_result %>% select(team, season, round, last_result), by = c("team2" = "team", "season", "round")) %>% rename(team2_last_result = last_result)
+
+
+
+
+# Calculating Full or Split Rounds ----------------------------------------
+
+round_games <- all_data_cleaned %>% filter(!str_detect(round, "Final")) %>% mutate(round = as.numeric(round)) %>% 
+  count(season, round) %>% ungroup() %>% rename(games_this_round = n) %>% arrange(season, round) %>% mutate(round = as.character(round))
+
+# Before the 2011 season, there were 8 games every round, but this changed in 2011 when Goald Coast was introduced, 
+# bringing the total teams to 17, meaning there was always one team on bye.
+# from 2012, the full number of games per round was 9, so any round that didn't have 9 games is considered a split round.
+round_games <- round_games %>% 
+  mutate(split_round = ifelse(season < 2012 | games_this_round == 9, "Full", "Split"))
+
+# join back to the main df
+all_data_cleaned <- all_data_cleaned %>%
+  left_join(round_games %>% select(season, round, split_round), by = c("season", "round"))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Save Data For Analysis --------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 saveRDS(all_data_cleaned, "data/cleaned_data/game_weather_betting_data.rds")
 
 
