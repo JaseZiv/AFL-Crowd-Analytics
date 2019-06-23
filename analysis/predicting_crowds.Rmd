@@ -12,7 +12,9 @@ theme_set(theme_minimal() +
             theme(panel.grid = element_blank(),
                   plot.title = element_text(size = 18, colour = "darkred"),
                   axis.title.x = element_text(size = 14, colour = "darkred", hjust = 1),
-                  axis.title.y = element_text(size = 14, colour = "darkred", hjust = 1, angle = 360)))
+                  axis.title.y = element_text(size = 14, colour = "darkred", hjust = 1, angle = 360),
+                  axis.text.x = element_text(size = 12),
+                  axis.text.y = element_text(size = 12)))
 
 library(tidyverse)
 library(scales)
@@ -21,6 +23,9 @@ library(scales)
 
 ```{r}
 afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
+
+afl <- all_data_cleaned
+
 ```
 
 
@@ -35,7 +40,7 @@ Anyway, that's my two cents worth. This analysis is not on crowd behaviour. This
 afl %>% ggplot(aes(x=attendance)) +
   geom_histogram(colour = "midnightblue", fill = "lightgrey") +
   scale_x_continuous(labels = comma, name = "Attendance") +
-  labs(y= "Number\nof Games", title = "SOME GAMES DO DRAW SOME LARGE CROWDS") +
+  labs(y= "Number\nof Games", title = "SOME LARGER DRAWING GAMES SKEWING DATA SLIGHTLY") +
   geom_vline(xintercept = median(afl$attendance), linetype = 2, colour = "darkred", size = 1) +
   geom_text(aes(label = paste0("Median Crowd: ", comma(median(afl$attendance))), x= median(afl$attendance) + 15000), y= 350, colour = "darkred") +
   ylim(0,400) +
@@ -55,6 +60,21 @@ Data was collected from a few different online sources. The game and attendance 
 
 The data contained at AFL Tables is a rich source of information, but some steps were needed to glean some additional information from the data. 
 
+## Venues
+
+The venues that were used infrequently, or more accurately, weren't the teams primary of close second stadium (ie York Park for Hawthorn), were labelled as "Other". There were 94 games played at these venues, and this includes at stadiums like *Eureka Stadium*, *Cazaly's Stadium*, *Traeger Park*, and international venues *Wellington* in NZ and *Jiangwan Stadium* in China.
+```{r}
+afl %>% count(venue) %>% mutate(is_other = ifelse(venue == "Other", "Y", "N")) %>% 
+  ggplot(aes(x= reorder(venue, n), y= n, fill = is_other)) + 
+  geom_col(colour = "midnightblue") + 
+  ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
+  geom_text(aes(label = comma(n)), hjust = 0, size = 9, colour = "darkred") +
+  scale_fill_manual(values = c('lightgrey', 'orange')) +
+  coord_flip() +
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank(), legend.position = "none")
+```
+
+
 ## Game Time
 
 Take the game start time as an example - having the time is great, but a regression model may find it better to reclassify the time to a period of the day to reduce some of the noise. So, with that in mind, a feature (*time_period*) was created - if the game started by 5pm, I have classified it as an afternoon game. Games started between 5pm-7pm were classified as evening games, while games later than this were night games.
@@ -66,7 +86,7 @@ afl %>% count(time_period) %>%
   ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
   geom_text(aes(label = comma(n)), hjust = 1, size = 9, colour = "darkred") +
   coord_flip() +
-  theme(axis.title.x = element_blank(), axis.text = element_blank(), axis.title.y = element_blank())
+  theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
 ```
 
 Additionally, the day of the week and the *time_period* were joined into one variable to use in the model. For example, if it was a Saturday game starting at 5:30pm, it was classified as "Sat-Evening". 
@@ -92,12 +112,14 @@ To be a rivalry, a few different options existed. The first contains the four ol
 
 ## Betting Odds
 
-Betting data collected started in 2009 and appears to be a rich source of information on where the two team's are at for each game. I dare say it's a good predictor of game results...but that's not the purpose of this analysis.
+Betting data collected for this analysis is from 2009 and appears to be a rich source of information on where the two team's are at for each game. I dare say it's a good predictor of game results...but that's not the purpose of this analysis.
 
-I feel like it would also be a good predictor of whether fans will turn up to games (ok, maybe I heard a talk from a key AFL staffer discussing this), so have gone out and collected some betting data. The difference between the head-to-head odds was calculated to use as a feature.
+I feel like it would also be a good predictor of whether fans will turn up to games (ok, maybe I heard a talk from a key AFL staffer discussing this), so have gone out and collected some betting data. The difference between the head-to-head odds of the two teams was calculated to use as a feature.
 
-Another betting odds feature was created to indicate whether the home team was the favourite. The thinking being that members of the home team would be more likely to attend if their team had a chance in the eyes of the betting agencies (and our collective hearts).
+Another betting odds feature was created to indicate whether the home team was the favourite. The thinking being that members of the home team would be more likely to attend if their team had a better chance in the eyes of the betting agencies (and our collective hearts).
 
+
+# Exploring The Potential Relationships Between Features and the Target Variable (Attendance)
 
 
 
@@ -121,14 +143,44 @@ Another betting odds feature was created to indicate whether the home team was t
 
 
 ```{r}
-
 afl_pre_2019 <- afl %>% filter(season < 2019) %>% filter(!str_detect(round, "Final"))
 
 # afl_pre_2019 <- afl_pre_2019 %>% mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
 #                                         rain = ifelse(actual_days_rain > 2, "Yes", "No"),
 #                                         HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
+afl_2019 <- afl %>% filter(season == 2019)
+
+
 ```
+
+# Baseline Model
+Before building a model to predict games, we want a baseline model to be able to compare to. The temptation would be there to use the average crowd for each game as a baseline, but the different venue capacities make this less than relevant. As a result, to calculate the baseline model, I will use the median attendance for each vanue (taking the average of the venues labelled "Other" as a whole). The median is used because of the slightly skewed nature of AFL crowds.
+
+```{r}
+median_attendances <- afl_pre_2019 %>% 
+  group_by(venue) %>% 
+  summarise(baseline_attendance = median(attendance)) %>% ungroup()
+
+baseline <- afl_2019 %>% select(venue, attendance) %>% left_join(median_attendances, by = "venue")
+
+sqrt(mean((baseline$baseline_attendance - baseline$attendance) ^2))
+
+
+# the below can also be used as a baseline model - it includes the home team and the venue. The RMSE of this baseline is 10,600
+
+# median_attendances <- afl_pre_2019 %>% 
+#   group_by(venue, team1) %>% 
+#   summarise(baseline_attendance = median(attendance)) %>% ungroup()
+# 
+# baseline <- afl_2019 %>% select(venue, team1, attendance) %>% left_join(median_attendances, by = c("venue", "team1"))
+# 
+# sqrt(mean((baseline$baseline_attendance - baseline$attendance) ^2))
+
+```
+
+Using the average attendances per ground as our baseline, an RMSE of `r comma(sqrt(mean((baseline$baseline_attendance - baseline$attendance) ^2)))` is achieved, or on average, the error of this baseline model is almost 12,500 in attendance. Any model that is built from here needs to be better than this. 
+
 
 
 
@@ -138,59 +190,12 @@ afl %>% ggplot(aes(x=log(attendance))) + geom_histogram()
 
 
 
-The baseline model using OLS, with team1 + team2 + round + venue + start_time as the independant variables is below. The model explains 73% of the variability in crowds. Let's see if this can improve.
-
 ```{r}
-fit_lm <- lm(attendance ~ team1 + team2 + round + venue + start_time, data = afl_pre_2019)
+fit_lm <- lm(attendance ~ team1 + team2 + round + venue + game_time + odds_diff + HomeTeamFav + rivalry_game + team1_last_result + team2_last_result, data = afl_pre_2019)
+
+car::vif(fit_lm)
 
 summary(fit_lm)
-```
-
-
-By using the day of the week the game was played and whether it was a day, evening or night game, the variation explained has been able to increase to 74%.
-```{r}
-fit_lm2 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period, data = afl_pre_2019)
-
-summary(fit_lm2)
-
-```
-
-
-
-The R^2 of the model increases to 79% when the difference between the home and away team's opening head-to-head odds, the closing line of the game and whether there was more than 2ml of rain.
-```{r}
-fit_lm3 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + rain, data = afl_pre_2019)
-
-summary(fit_lm3)
-
-```
-
-
-```{r}
-fit_lm4 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + rain + HomeTeamFav, data = afl_pre_2019)
-
-summary(fit_lm4)
-
-
-```
-
-
-
-Including a variable for rivalry game and removing the "rain" variable sees the model's explainability increase to 82%...
-
-```{r}
-fit_lm5 <- lm(attendance ~ team1 + team2 + round + venue + weekday + time_period + odds_diff + abs(HomeLineOpen) + HomeTeamFav + rivalry_game, data = afl_pre_2019)
-
-# summary(fit_lm5)
-
-
-
-fit_lm6 <- lm(attendance ~ team1 + team2 + round + venue + game_time + odds_diff + HomeTeamFav + rivalry_game, data = afl_pre_2019)
-
-summary(fit_lm6)
-
-plot(fit_lm6)
-
 ```
 
 
@@ -199,7 +204,6 @@ plot(fit_lm6)
 # fit model
 
 ```{r}
-afl_2019 <- afl %>% filter(season == 2019) %>% filter(GameID != '2019-04-24-Richmond-Melbourne')
 
 actual_2019crowds <- afl_2019$attendance
 
@@ -208,7 +212,7 @@ afl_2019 <- afl_2019 %>% select(-attendance)
 
 
 # fit linear model 6
-afl_2019$predicted_attendance <- predict(fit_lm6, afl_2019)
+afl_2019$predicted_attendance <- predict(fit_lm, afl_2019)
 
 afl_2019$attendance <- actual_2019crowds
 
@@ -222,11 +226,6 @@ afl_2019 %>%
   geom_point() +
   geom_abline(slope = 1, intercept=0)
 
-
-afl_2019 %>% 
-  ggplot(aes(x=attendance, y= predicted_attendance)) +
-  geom_point() +
-  geom_smooth(method = "lm")
 
 
 
