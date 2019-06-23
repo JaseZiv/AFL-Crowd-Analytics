@@ -158,9 +158,12 @@ all_data_cleaned <- all_data_cleaned %>%
          rain = ifelse(actual_days_rain > 2, "Yes", "No"),
          HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
+weekend_games <- c("Fri", "Sat", "Sun")
+
 # join the day of week the game is played and the time period it's played in
 all_data_cleaned <- all_data_cleaned %>% 
-  mutate(game_time = paste(weekday, time_period, sep = ' '))
+  mutate(game_time = paste(weekday, time_period, sep = ' ')) %>% 
+  mutate(game_time = ifelse(weekday %in% weekend_games, game_time, paste("Weekday", time_period, sep = " ")))
 
 
 
@@ -203,6 +206,16 @@ round_games <- round_games %>%
 # join back to the main df
 all_data_cleaned <- all_data_cleaned %>%
   left_join(round_games %>% select(season, round, split_round), by = c("season", "round"))
+
+
+
+# Venues ------------------------------------------------------------------
+
+legitimate_venues <- c("M.C.G.", "Docklands", "Subiaco", "Football Park", "Gabba", "S.C.G.", "Kardinia Park", "Adelaide Oval", "Carrara", "York Park", "Sydney Showground", 
+                       "Stadium Australia", "Manuka Oval", "Perth Stadium", "Bellerive Oval")
+
+
+all_data_cleaned <- all_data_cleaned %>% mutate(venue = ifelse(venue %in% legitimate_venues, venue, "Other"))
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Save Data For Analysis --------------------------------------------------
