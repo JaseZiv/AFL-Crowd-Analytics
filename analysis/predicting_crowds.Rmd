@@ -8,6 +8,9 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 
+library(tidyverse)
+library(scales)
+
 theme_set(theme_minimal() +
             theme(panel.grid = element_blank(),
                   plot.title = element_text(size = 18, colour = "darkred"),
@@ -16,15 +19,13 @@ theme_set(theme_minimal() +
                   axis.text.x = element_text(size = 12),
                   axis.text.y = element_text(size = 12)))
 
-library(tidyverse)
-library(scales)
 ```
 
 
 ```{r}
 afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
 
-afl <- all_data_cleaned
+afl_premiership_season <- afl %>% filter(!str_detect(round, "Final"))
 
 ```
 
@@ -33,28 +34,47 @@ afl <- all_data_cleaned
 
 There is a lot of talk about crowd behaviour and crowd issues with the modern day AFL. I personally feel the crowd issues are a case of *business-as-usual*; I've been going to AFL games on-and-off for close to three decades and the crowd behaviour is no different today as it was 20 years ago... just now everyone with a phone and Twitter account is a journo.
 
-Anyway, that's my two cents worth. This analysis is not on crowd behaviour. This but is primarily concerned with building a model to predict AFL crowds during the season proper. The model will be bult on data from the last 10 years, as betting data was only available since then. The analysis however will be based on the last 20 years worth of games.
+Anyway, that's my two cents worth. This analysis is not on crowd behaviour. This post is primarily concerned with building a model to predict AFL crowds during the season proper. The model will be bult on data from the last 10 years, as betting data was only available since then. The analysis however will be based on the last 20 years worth of games.
 
 
 ```{r}
-afl %>% ggplot(aes(x=attendance)) +
-  geom_histogram(colour = "midnightblue", fill = "lightgrey") +
+afl_premiership_season %>% 
+  ggplot(aes(x=attendance)) +
+  geom_histogram(colour = "midnightblue", fill = "steelblue") +
   scale_x_continuous(labels = comma, name = "Attendance") +
   labs(y= "Number\nof Games", title = "SOME LARGER DRAWING GAMES SKEWING DATA SLIGHTLY") +
-  geom_vline(xintercept = median(afl$attendance), linetype = 2, colour = "darkred", size = 1) +
-  geom_text(aes(label = paste0("Median Crowd: ", comma(median(afl$attendance))), x= median(afl$attendance) + 15000), y= 350, colour = "darkred") +
+  geom_vline(xintercept = median(afl_premiership_season$attendance), linetype = 2, colour = "darkred", size = 0.5) +
+  geom_text(aes(label = paste0("Median Crowd: ", comma(median(afl_premiership_season$attendance))), x= median(afl_premiership_season$attendance) + 15000), y= 350, colour = "darkred") +
   ylim(0,400) +
   theme(panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
   
   
 ```
 
-Over the last 20 years, the median (the 50% mark and a better measure than the average on skewed data) crowd to AFL games was just over 33,500.
+Over the last 20 years, the median (the 50% mark and a better measure than the average on skewed data) crowd to AFL games was just over 33,000.
+
+
+The last 20 seasons have seen some peaks and throughs though, with median attendances ranging from just under 29,000 in 2012 to just over 36,800 in 2008. The low attendances in 2012-13 was no doubt fuelled by the introduction of the newest expansion teams (Gold Coast and GWS) in regions that are traditionally not AFL strongholds. The last five years however have seen a rebound of sorts as these clubs slowly build up fanbases (and in the case of GWS start to have some success).
+
+```{r}
+afl_premiership_season %>% 
+  filter(season < 2019) %>% 
+  group_by(season) %>%
+  summarise(median_attendance = median(attendance)) %>% 
+  ggplot(aes(x= season, y= median_attendance, group = 1)) +
+  geom_line() +
+  geom_point() +
+  labs(x= "Season", y= "Median\nAttendance", title = "PREMIERSHIP SEASON MEDIAN ATTENDANCES", subtitle = "Current 2019 season excluded") +
+  scale_y_continuous(labels = comma) +
+  annotate("text", x=2013, y= 28500, label = "The introduction of Gold Coast and GWS\nreally hurt attendances in 2012/13") +
+  theme(plot.subtitle = element_text(colour = "darkred"))
+```
+
 
 ## The Data
 Data was collected from a few different online sources. The game and attendance data was sourced from the amazing [AFL Tables](https://afltables.com), while the betting data was sourced from the [Australian Sports Betting](http://www.aussportsbetting.com) website. 
 
-
+***
 
 # Feature Engineering
 
@@ -62,13 +82,14 @@ The data contained at AFL Tables is a rich source of information, but some steps
 
 ## Venues
 
-The venues that were used infrequently, or more accurately, weren't the teams primary of close second stadium (ie York Park for Hawthorn), were labelled as "Other". There were 94 games played at these venues, and this includes at stadiums like *Eureka Stadium*, *Cazaly's Stadium*, *Traeger Park*, and international venues *Wellington* in NZ and *Jiangwan Stadium* in China.
+The venues that were used infrequently, or more accurately, weren't the teams primary or close second "home" stadium (ie York Park for Hawthorn), were labelled as "Other". There were 94 games played at these venues, and this includes at stadiums like *Eureka Stadium*, *Cazaly's Stadium*, *Traeger Park*, and international venues *Wellington* in NZ and *Jiangwan Stadium* in China.
+
 ```{r}
-afl %>% count(venue) %>% mutate(is_other = ifelse(venue == "Other", "Y", "N")) %>% 
+afl_premiership_season %>% count(venue) %>% mutate(is_other = ifelse(venue == "Other", "Y", "N")) %>% 
   ggplot(aes(x= reorder(venue, n), y= n, fill = is_other)) + 
   geom_col(colour = "midnightblue") + 
-  ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
-  geom_text(aes(label = comma(n)), hjust = 0, size = 9, colour = "darkred") +
+  ggtitle("DOCKLANDS HAD MORE PREMIERSHIP SEASON GAMES\nTHAN THE MIGHTY G THE LAST 20 YEARS") +
+  geom_text(aes(label = comma(n)), hjust = 0, size = 7, colour = "darkred") +
   scale_fill_manual(values = c('lightgrey', 'orange')) +
   coord_flip() +
   theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank(), legend.position = "none")
@@ -77,10 +98,10 @@ afl %>% count(venue) %>% mutate(is_other = ifelse(venue == "Other", "Y", "N")) %
 
 ## Game Time
 
-Take the game start time as an example - having the time is great, but a regression model may find it better to reclassify the time to a period of the day to reduce some of the noise. So, with that in mind, a feature (*time_period*) was created - if the game started by 5pm, I have classified it as an afternoon game. Games started between 5pm-7pm were classified as evening games, while games later than this were night games.
+Take the game start time as an example - having the time is great, but a regression model may find it better to categorise the time to a period of the day to reduce some of the noise. So, with that in mind, a feature (`time_period`) was created - if the game started by 5pm, I have classified it as an afternoon game. Games started between 5pm-7pm were classified as evening games, while games later than this were night games.
 
 ```{r}
-afl %>% count(time_period) %>% 
+afl_premiership_season %>% count(time_period) %>% 
   ggplot(aes(x= reorder(time_period, n), y= n)) + 
   geom_col(fill = "lightgrey", colour = "midnightblue") + 
   ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
@@ -89,14 +110,14 @@ afl %>% count(time_period) %>%
   theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
 ```
 
-Additionally, the day of the week and the *time_period* were joined into one variable to use in the model. For example, if it was a Saturday game starting at 5:30pm, it was classified as "Sat-Evening". 
+Additionally, the day of the week and the `time_period` were joined into one variable to use in the model. For example, if it was a Saturday game starting at 5:30pm, it was classified as "Sat-Evening". 
 
 ```{r}
-afl %>% count(game_time) %>% 
+afl_premiership_season %>% count(game_time) %>% 
   ggplot(aes(x= reorder(game_time, n), y= n)) + 
   geom_col(fill = "lightgrey", colour = "midnightblue") + 
   ggtitle("MORE AFTERNOON GAMES THAN ANY OTHER TIME GROUP") +
-  geom_text(aes(label = comma(n)), hjust = 1, size = 9, colour = "darkred") +
+  geom_text(aes(label = comma(n)), hjust = 0, size = 7, colour = "darkred") +
   coord_flip() +
   theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
 ```
@@ -114,18 +135,44 @@ To be a rivalry, a few different options existed. The first contains the four ol
 
 Betting data collected for this analysis is from 2009 and appears to be a rich source of information on where the two team's are at for each game. I dare say it's a good predictor of game results...but that's not the purpose of this analysis.
 
-I feel like it would also be a good predictor of whether fans will turn up to games (ok, maybe I heard a talk from a key AFL staffer discussing this), so have gone out and collected some betting data. The difference between the head-to-head odds of the two teams was calculated to use as a feature.
+I feel like it would also be a good predictor of whether fans will turn up to games (ok, maybe I heard a talk from a key AFL staffer discussing this), so have gone out and collected some betting data. The difference between the head-to-head odds of the two teams was calculated to use as a feature (`odds_diff`).
 
-Another betting odds feature was created to indicate whether the home team was the favourite. The thinking being that members of the home team would be more likely to attend if their team had a better chance in the eyes of the betting agencies (and our collective hearts).
+Another betting odds feature was created (`HomeTeamFav`) to indicate whether the home team was the favourite. The thinking being that members of the home team would be more likely to attend if their team had a better chance in the eyes of the betting agencies (and our collective hearts).
+
+***
 
 
 # Exploring The Potential Relationships Between Features and the Target Variable (Attendance)
 
+This section will contain some Exploratory Data Analysis (more commonly known as 'EDA'), which is a natural first step in any data analysis project. It is an extrememly important step and allows the analyst to inspect the data - what shape does the target and predictor variables have, are there any correlations between the variables that may be included in a predictive model, are ther any outliers in the data, or any missing data... you get the point, EDA is very important!
+
+The analysis has already shown the target variable `Attendance` is slightly right-skewed, meaning that there are some games at the higher end of the crowd figures skewing the distribution, and that the median (a better measure of centrality) crowd attendance for the last 20 years was 33,587. 
+
+
+
+
+```{r}
+afl_premiership_season %>% 
+  ggplot(aes(x = venue, y = attendance)) +
+  geom_jitter(alpha = 0.2, colour = "steelblue") +
+  scale_y_continuous(labels = comma) +
+  coord_flip() +
+  theme(axis.title.y = element_blank())
+```
+
+
+```{r}
+afl %>% 
+  ggplot(aes(x = time_period, y = attendance)) +
+  geom_boxplot()
+
+```
 
 
 
 
 
+# Things that were attempted but not included in the model
 
 
 
@@ -180,6 +227,22 @@ sqrt(mean((baseline$baseline_attendance - baseline$attendance) ^2))
 ```
 
 Using the average attendances per ground as our baseline, an RMSE of `r comma(sqrt(mean((baseline$baseline_attendance - baseline$attendance) ^2)))` is achieved, or on average, the error of this baseline model is almost 12,500 in attendance. Any model that is built from here needs to be better than this. 
+
+
+
+
+```{r}
+median_attendances <- afl_pre_2019 %>% 
+  group_by(team1, team2, venue) %>% 
+  summarise(baseline_attendance = median(attendance)) %>% ungroup()
+
+baseline <- afl_2019 %>% select(team1, team2, venue, attendance) %>% left_join(median_attendances, by = c("team1", "team2", "venue"))
+
+
+baseline_test <- baseline %>% filter(!is.na(baseline_attendance))
+
+sqrt(mean((baseline_test$baseline_attendance - baseline_test$attendance) ^2))
+```
 
 
 
