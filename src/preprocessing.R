@@ -3,18 +3,29 @@ library(httr)
 library(lubridate)
 library(tidyverse)
 
+# read in the scraped data
+afl_pre_19 <- read.csv("data/afl_games_pre2019.csv", stringsAsFactors = F)
+afl2019 <- read.csv("data/afl_games_2019.csv", stringsAsFactors = F)
 
-all_data <- readRDS("data/afl_games.rds")
+# combine into one DF
+all_data <- rbind(afl_pre_19, afl2019) %>% data.frame()
+
+# remove the individual datasets
+rm(afl_pre_19, afl2019);gc()
 
 # Data pre-processing -----------------------------------------------------
-
-glimpse(all_data)
 
 # make all variables character type to make splitting and string manipulation easier
 all_data <- all_data %>% 
   mutate_if(is.factor, as.character) %>% 
   mutate(team1_score = as.numeric(team1_score),
          team2_score = as.numeric(team2_score))
+
+
+# North Melbourne have their name as both 'North Melbourne' and 'Kangaroos'
+all_data <- all_data %>% 
+  mutate(team1 = ifelse(team1 == "Kangaroos", "North Melbourne", team1),
+         team2 = ifelse(team2 == "Kangaroos", "North Melbourne", team2))
 
 
 # Splitting metadata into meaningful variables ----------------------------
@@ -36,7 +47,7 @@ all_data_cleaned <- all_data_cleaned %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(attendance = as.numeric(attendance))
 
-# split out the date information to its own variable, remove the time in parentheses and only keep the locat game start time 
+# split out the date information to its own variable, remove the time in parentheses and only keep the local game start time 
 all_data_cleaned <- all_data_cleaned %>% 
   separate(date, into = c("date", NA), sep = "\\(") 
 # remove the day of week from the date variable - this can always be added in using the lubridate package
@@ -83,31 +94,33 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(venues_df, by = "venue")
 
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Read in Rain Data -------------------------------------------------------
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-rain_data <- read_csv("data/cleaned_data/preprocessed_rain_data.csv") %>% data.frame()
-
-
-rain_data$location[rain_data$location == "adl"] <- "Adelaide"
-rain_data$location[rain_data$location == "brs"] <- "Brisbane"
-rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
-rain_data$location[rain_data$location == "melb"] <- "Melbourne"
-rain_data$location[rain_data$location == "perth"] <- "Perth"
-rain_data$location[rain_data$location == "syd"] <- "Sydney"
-rain_data$location[rain_data$location == "tas"] <- "Hobart"
-rain_data$location[rain_data$location == "gee"] <- "Geelong"
-
-
-# select only required variables
-rain_data <- rain_data %>% 
-  select(weather_date, rainfall_ml = `Rainfall.amount..millimetres.`, days_rainfall_measured = `Period.over.which.rainfall.was.measured..days.`, Quality, VenueCity = location, actual_days_rain)
-
-
-# Join back to main df
-all_data_cleaned <- all_data_cleaned %>% 
-  left_join(rain_data, by = c("date" = "weather_date", "VenueCity"))
+# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# # Read in Rain Data -------------------------------------------------------
+# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# 
+# rain_data <- read.csv("data/cleaned_data/preprocessed_rain_data.csv", stringsAsFactors = F) %>% data.frame()
+# 
+# 
+# rain_data$location[rain_data$location == "adl"] <- "Adelaide"
+# rain_data$location[rain_data$location == "brs"] <- "Brisbane"
+# rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
+# rain_data$location[rain_data$location == "melb"] <- "Melbourne"
+# rain_data$location[rain_data$location == "perth"] <- "Perth"
+# rain_data$location[rain_data$location == "syd"] <- "Sydney"
+# rain_data$location[rain_data$location == "tas"] <- "Hobart"
+# rain_data$location[rain_data$location == "gee"] <- "Geelong"
+# 
+# 
+# # select only required variables
+# rain_data <- rain_data %>% 
+#   select(weather_date, rainfall_ml = `Rainfall.amount..millimetres.`, days_rainfall_measured = `Period.over.which.rainfall.was.measured..days.`, Quality, VenueCity = location, actual_days_rain)
+# 
+# # ensure date variable in weather data is Date type
+# rain_data <- rain_data %>% mutate(weather_date = ymd(weather_date))
+# 
+# # Join back to main df
+# all_data_cleaned <- all_data_cleaned %>% 
+#   left_join(rain_data, by = c("date" = "weather_date", "VenueCity"))
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -155,7 +168,7 @@ all_data_cleaned <- all_data_cleaned %>%
 # calculate the odds differences, if it rained or not, and whether the home team is the favourite
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
-         rain = ifelse(actual_days_rain > 2, "Yes", "No"),
+         # rain = ifelse(actual_days_rain > 2, "Yes", "No"),
          HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
 weeknight_games <- c("Mon", "Tue", "Wed")
@@ -220,7 +233,7 @@ all_data_cleaned <- all_data_cleaned %>% mutate(venue = ifelse(venue %in% legiti
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Save Data For Analysis --------------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-saveRDS(all_data_cleaned, "data/cleaned_data/game_weather_betting_data.rds")
+write.csv(all_data_cleaned, "data/cleaned_data/afl_preprocessed.csv", row.names = F)
 
 
 

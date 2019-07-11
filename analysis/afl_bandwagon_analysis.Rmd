@@ -1,24 +1,42 @@
 ---
 title: "Jumping on the Bandwagon"
-output: html_document
+output:
+  html_document:
+    code_folding: hide
+    theme: journal
+    highlight: tango
+    df_print: paged
+    fig_height: 8
+    fig_width: 11
+    number_sections: no
+    toc: yes
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = FALSE)
 ```
 
 # Introduction
 
-This post is the first in a two-part series on AFL crowds. This analysis will be a thorough look at AFL crowd numbers over the last 20 years, and will concern itself with discovering whose teams fans are the biggest bandwagon jumpers. *Bandwagon Jumpers* are those fans that are the loudest in the office or in your friendship group when things are going well, and the quietest when their team is losing.
+This post is the first in a two-part series on AFL crowds. This analysis will be a thorough look at AFL crowd numbers over the last 20 years, and will aim at discovering whose teams fans are the biggest bandwagon jumpers. *Bandwagon Jumpers* are those fans that are the loudest in the office or in your friendship group when things are going well, and the quietest when their team is losing. The analysis will use two questions to answer this:
+
+1. Which team's home attendance is affected more because of the previous week's performance
+    a. Here I will introduce three new metrics to measure this effect
+2. Does the chance the betting markets give their team to win affect a team's home attendance
 
 People all have their theories on which team's fans are the worst offending bandwagoners; this analysis will try to answer it once and for all! Also, sefishly, I'm sick of people telling me that fans of my team - the Hawthorn Hawks (a team that has experienced tremendous success over the last 10 years) are the worst offenders.
+
 
 ## The Data
 Data was collected from a few different online sources. The game and attendance data was sourced from the amazing [AFL Tables](https://afltables.com), while the betting data was sourced from the [Australian Sports Betting](http://www.aussportsbetting.com) website. 
 
+All the code and data for this project is available on [GitHub](https://github.com/JaseZiv/AFL-Crowd-Analytics)
+
+The data is current to round 16 of the 2019 season.
+
 ***
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(scales)
 
@@ -33,19 +51,15 @@ theme_set(theme_minimal() +
 ```
 
 
-```{r}
-afl <- readRDS("data/cleaned_data/game_weather_betting_data.rds")
-
-afl <- afl %>% 
-  mutate(team1 = ifelse(team1 == "Kangaroos", "North Melbourne", team1),
-         team2 = ifelse(team2 == "Kangaroos", "North Melbourne", team2))
+```{r, warning=FALSE, message=FALSE}
+afl <- read.csv("../data/cleaned_data/afl_preprocessed.csv", stringsAsFactors = F)
 
 afl_premiership_season <- afl %>% filter(!str_detect(round, "Final"))
 ```
 
-Over the last 20 years, the median (the 50% mark and a better measure than the average on skewed data) crowd to AFL games was just over 33,500. The data is positively skewed with a tail that extends out to 100,000. 
+Over the last 20 years, the median (the 50% mark and a better measure than the average on skewed data) crowd to AFL games was 33,600. The data is positively skewed with a tail that extends out to 100,000. 
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 afl %>% 
   mutate(is_finals = ifelse(str_detect(round, "Final"), "Finals", "Regular")) %>% 
   ggplot(aes(x=attendance)) +
@@ -60,12 +74,7 @@ afl %>%
 
 Thankfully for the AFL, the finals series at the end of the season draws larger crowds than the premiership (regular season for non-AFL fans) season. The median attendance for the premiership season is just over 33,000, while for finals it is over 58,000. The finals series are the flagship games for the AFL - they would hope these games would draw larger crowds. 
 
-```{r}
-afl %>% 
-  mutate(is_finals = ifelse(str_detect(round, "Final"), "Finals", "Regular")) %>% 
-  group_by(is_finals) %>% 
-  summarise(median(attendance))
-
+```{r, warning=FALSE, message=FALSE}
 afl %>% 
   mutate(is_finals = ifelse(str_detect(round, "Final"), "Finals", "Regular")) %>% 
   ggplot(aes(x= is_finals, y= attendance)) +
@@ -73,8 +82,6 @@ afl %>%
   scale_y_continuous(labels = comma, name = "Attendance") +
   ggtitle("FINALS DRAW LARGER CROWDS... THANKFULLY") +
   theme(axis.title.x = element_blank(), panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
-
-
 ```
 
 The rest of the analysis will only focus on the premiership season.
@@ -82,7 +89,7 @@ The rest of the analysis will only focus on the premiership season.
 
 The last 20 seasons have seen some peaks and throughs though, with median attendances ranging from just under 29,000 in 2012 to just over 36,800 in 2008. The low attendances in 2012-13 was no doubt fuelled by the introduction of the newest expansion teams - Gold Coast and Greater Western Sydney (GWS) - in regions that are traditionally not AFL strongholds. The last five years however have seen a rebound of sorts, as these clubs slowly build up fanbases (and in the case of GWS start to have some success).
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 afl_premiership_season %>% 
   filter(season < 2019) %>% 
   group_by(season) %>%
@@ -115,16 +122,18 @@ There are seven teams that have had above average crowds since the 2000 season:
 
 Four of those clubs are Victorian clubs, with the other two from South Australia and Western Australia. This is important to note that even though the AFL is a national competition, these three states are traditionally stronghold states. Brisbane - despite their extreme success in the early part of this century and the fact that a Victorian club merged with then (Fitzroy Lions) - have the third lowest attendances. Only recent expansion teams GWS and Gold Coast have lower attendances. The north-east states are clearly a problem for the league.
 
-```{r}
+```{r, warning=FALSE, message=FALSE}
 team_attendances <- afl_premiership_season %>% 
   select(Team = team1, round, season, venue, date, game_time, winner, attendance, last_result = team1_last_result) %>% 
-  mutate(home_or_away = "Home") %>% 
-  union(afl_premiership_season %>% 
+  mutate(home_or_away = "Home") %>%
+  bind_rows(afl_premiership_season %>% 
           select(Team = team2, round, season, venue, date, game_time, winner, attendance, last_result = team2_last_result) %>% 
           mutate(home_or_away = "Away"))
   
 median_attendance_overall <- median(afl_premiership_season$attendance)
 
+# a <- lm(attendance ~ last_result, data = team_attendances)
+# summary(a)
 
 team_attendances %>% 
   group_by(Team) %>% 
@@ -142,51 +151,188 @@ team_attendances %>%
 ```
 
 
-# Last Week's Performance Impact
+# Which team's home attendance is affected more because of the previous week's performance
 
-To answer this question, we can look at the difference in attendance for each team the next game after a win or a loss. A few things to note using this method:
+To answer this question, we can look at the difference in attendance for each team the next game after a win or a loss. Three metrics have been created to help answer this question:
+
+* Losing Impact on Attendance (LIoA)
+* Winning Impact on Attendance (WIoA)
+* Overall Performance Impact (OPI)
+
+To create the LIoA and WIoA metrics, the median home attendance (regadless if the previous game was a a win or loss) was calculated for each team. To calculate the LIoA, the median home attendance after a loss was claculated and the percentage difference between this and the overall median home attendance became the measure. The WIoA was calculated in almost the same way, but the median home attandance after a win was used instead.
+
+Finally, OPI is calculated as the difference between WIoA and LIoA.
+
+A few things to note using this method:
 
 1. Round one games have been excluded as the previous game was the last season and there's too much noise using that
-2. The difference was calculated taking the median attendance after either a win or loss and comparing that against the team's overall median attendance for the season.
+2. Only home games for each team have been used to calculate the metrics
+3. With a p-value < 0.05, the team's last result is a significant predictor
 
-First thing we can do is visualise the data. Using boxplots to show the team's distribution of attendances for games wither after a win or loss, we can see that there are what appear to be considerable differences for some teams. Where the line in the middle of the box (the median) differs noticably between a win or loss the previous week is an indication that that team's supporters may be less inclined to attend their team's games after a loss (or more inclined after a win).
 
-Hmmm well that certainly doesn't help my case. Hawthorn's losing attendance impact (LAI) is 11%, meaning that Hawthorn fan attendance at games after a loss is 11% lower than their season median attendance. Only GWS have a worse LAI at 16.9% difference. Of the four traditionally big supporter based clubs in Victoria (Carlton, Collingwood, Essendon, Richmond), Collingwood fans are the worst at not showing up a week after a loss, with a 7.5% LAI, while Essendon fans are the most resillient of this bunch (1.9% LAI). So much for Richmond fans telling me they're the most resillient.
+First thing we can do is visualise the data. Using boxplots to show the team's distribution of home attendances for games both after a win and loss, we can see that there are what appear to be considerable differences for some teams. Where the line in the middle of the box (the median) differs noticably between a win or loss the previous week is an indication that that team's supporters may be less inclined to attend their team's games after a loss (or more inclined after a win).
 
-At the other end of the Spectrum, West Coast supporters turn up in virtually the same numbers on average wiht an LAI of 0.6%, while the Western Bulldogs have an LAI of 0.9% (albeit at a much lower base than West Coast).
-
-```{r}
+```{r, warning=FALSE, message=FALSE, fig.height=8, fig.width=12}
 team_attendances %>% 
-  filter(!is.na(last_result)) %>% 
+  filter(!is.na(last_result),
+         home_or_away == "Home") %>% 
   ggplot(aes(y= attendance, x = last_result, fill= last_result)) +
   geom_boxplot() +
   scale_fill_manual(values = c("lightgrey", "steelblue")) +
-  facet_wrap(~ Team, scales = "free", ncol = 6) +
-  theme(legend.position = "none", strip.text = element_text(size = 12, face = "bold"), strip.background = element_rect(color="black", fill="#FFFFCC", size=1.5, linetype="solid"))
+  scale_y_continuous(labels = comma) +
+  ggtitle("SOME VARIANCE BETWEEN HOME TEAM ATTENDANCE AFTER WINS AND LOSSES") +
+  facet_wrap(~ Team, scales = "free", labeller = label_wrap_gen(), ncol = 6) +
+  theme(legend.position = "none", strip.text = element_text(size = 12, face = "bold"), strip.background = element_rect(color="black", fill="#FFFFCC", size=1.5, linetype="solid"), axis.title.x = element_blank(), axis.title.y = element_blank())
 
-
-
-
-team_attendances %>% 
-  filter(!is.na(last_result)) %>% 
-  group_by(Team) %>% 
-  mutate(median_overall_attendance = median(attendance)) %>% 
-  group_by(Team, last_result, median_overall_attendance) %>% 
-  summarise(median_attendances = median(attendance)) %>% 
-  spread(key = last_result, value = median_attendances) %>% 
-  mutate(LossDiff = round((Lost - median_overall_attendance) / median_overall_attendance, 4),
-         WinDiff = round((Won - median_overall_attendance) / median_overall_attendance, 4),
-         WinLossDiff = (Won - Lost) / Lost) %>% DT::datatable()
 ```
 
 
-# Finals Last Season Impact
+## Losing Impact on Attendance (LIoA)
+
+Hmmmm... well that certainly doesn't help my case. Hawthorn's Losing Impact on Attendance (LIoA) rating is -11.9% - a league worst, meaning that Hawthorn fan attendance at games after a loss is 13% lower than their season median home attendance. Another Victorian club, St Kilda, aren't far behind, with a LIoA of -10.7%. GWS and Collingwood follow closely, with an LIoA of -7.9 and -7.6% respectively. 
+
+At the other end of the spectrum, Geelong supporters appear to be unaffected by their team losing their prior game, with a 0.6% difference between their median home attendance. The Gold Coast Suns and South Australian club Adelaide are also fairly unaffected, with LIoA of -1.8% and -1.9% respectively. 
+
+## Winning Impact on Attendance (WIoA)
+
+Conversely, we can apply the same methodology to calculate a team's Winning Impact on Attendance (WIoA) to determine which fans respond more positively after a win. The Melbourne Football Club's fans appear to respond the most positively after their team win, with a WIoA of 13.6%. St Kilda are second on this list too, with a WIoA of 11.3% and North Melbourn are at 11.2%. Thankfully, my Hawks don't top this measure, however with a WIoA of 10.3%, they're not far behind.
+
+Again, Geelong fans have the best WIoA at less than half a percent, while Gold Coast and Essendon are also both under 2%.
+
+## Overall Performance Impact
+
+Calculating the difference between the two measures give an overall indicator of fan senstitvity to their team's last performanmce. I hate to say it, but Hawthorn fans top this list with an OPI of 22.2%, just edging out St Kilda on 22.0%. Melbourne and GWS are at around the 18% mark, while North, Richmond, Collingwood and Carlton in the 16-17% range.
+
+This pains me to say, but Geelong fans are the most consistent set of fans with an OPI of 1.1% Gold Coast, Adelaide and Essendon supporters are also fairly consistent in their attendance.
+
+```{r, warning=FALSE, message=FALSE}
+home_attendance_table <- team_attendances %>% 
+  filter(!is.na(last_result),
+         home_or_away == "Home") %>%
+  group_by(Team) %>% 
+  mutate(median_home_attendance = median(attendance)) %>% 
+  group_by(Team, last_result, median_home_attendance) %>% 
+  summarise(median_attendances = median(attendance)) %>% 
+  spread(key = last_result, value = median_attendances) %>% 
+  mutate(LIoA = round((Lost - median_home_attendance) / median_home_attendance, 4),
+         WIoA = round((Won - median_home_attendance) / median_home_attendance, 4),
+         OPI = WIoA - LIoA) %>% ungroup()
+
+
+library(kableExtra)
+
+home_attendance_table %>%
+  rename(`Median Home Attendance` = median_home_attendance, `Attendance After Loss` = Lost, `Attendance After Win` = Won) %>% 
+  mutate(
+  LIoA = cell_spec(LIoA, "html", color = ifelse(LIoA < -.1, "red", "grey")),
+  WIoA = cell_spec(WIoA, "html", color = ifelse(WIoA > .11, "red", ifelse( WIoA > .1, "orange", ifelse(WIoA < 0.015, "lightblue", "grey")))),
+  OPI = cell_spec(OPI, "html", color = ifelse(OPI > .2, "red", ifelse(OPI > .16, "orange", ifelse(OPI < 0.01, "lightblue", "grey"))))) %>%
+  select(Team, `Median Home Attendance`, `Attendance After Loss`, `Attendance After Win`, LIoA, WIoA, OPI) %>% 
+  kable(format = "html", escape = F) %>%
+  kable_styling("striped", full_width = F) 
+
+```
 
 
 
+# Does the chance the betting markets give their team to win affect a team's home attendance?
 
-# Team Favoured To Win Impact
+To answer this question, betting data was collected from the [Australian Sports Betting](http://www.aussportsbetting.com) website.
 
+Line data was available from 2013 onwards, so the crowd data for this question has been limited down to the last six seasons.
+
+The opening game lines were used for the Home Team. Where the line was within +/- 6 points (1 goal), the game was deemed to be `Neutral`, meaning no one was the favourite. If the line was set above 6 points, then the Home Team was the `Favourite`. Lastly, if the line was -6 points, the Home Team was the `Underdog`. This has also been found to be a significant predictor, also with a p-value close to zero.
+
+
+
+```{r, warning=FALSE, message=FALSE}
+df <- afl_premiership_season %>% 
+  filter(!is.na(HomeLineOpen)) %>% 
+  mutate(calc_HomeTeam_fav = ifelse(between(HomeLineOpen, -6, 6), "Neutral", ifelse(HomeLineOpen < -6, "Underdog", "Favourite")))
+
+
+
+betting_question <- df %>% 
+  select(Team = team1, round, season, venue, date, game_time, winner, attendance, last_result = team1_last_result, calc_HomeTeam_fav) %>% 
+  mutate(home_or_away = "Home") %>%
+  bind_rows(df %>% 
+              select(Team = team2, round, season, venue, date, game_time, winner, attendance, last_result = team2_last_result, calc_HomeTeam_fav) %>% 
+              mutate(home_or_away = "Away"))
+
+
+betting_question <- betting_question %>% filter(!is.na(calc_HomeTeam_fav),
+                  home_or_away == "Home")
+
+
+median_attendance_overall_betting <- betting_question %>% 
+  # group_by(Team) %>% 
+  summarise(median(attendance)) %>% pull()
+
+
+# a <- lm(attendance ~ calc_HomeTeam_fav, data = betting_question)
+# summary(a)
+
+
+home_attendance_table_betting <- betting_question %>% 
+  filter(calc_HomeTeam_fav %in% c("Underdog", "Favourite")) %>% 
+  group_by(Team) %>% 
+  mutate(median_home_attendance = median(attendance)) %>% 
+  group_by(Team, calc_HomeTeam_fav, median_home_attendance) %>% 
+  summarise(median_attendances = median(attendance)) %>% 
+  spread(key = calc_HomeTeam_fav, value = median_attendances) %>% 
+  mutate(Underdog_impact = round((Underdog - median_home_attendance) / median_home_attendance, 4),
+         Favourite_impact = round((Favourite - median_home_attendance) / median_home_attendance, 4),
+         betting_diff = Favourite_impact - Underdog_impact) %>% ungroup()
+```
+
+
+## Underdog Impact
+
+When the home team is the underdog, what is the impact to their home attendance?
+
+Carlton fans appear to be the most affected by their team's chance of victory - when they're the underdog, Carlton's home attendance is 8.5% lower than their overall median home attendance. Strangely, Melbourne's home attendance actually increases when they're the underdog, with the attendance 13.7% higher.
+
+Hawthorn feature near the top of this list too... not a good sign.
+
+```{r, warning=FALSE, message=FALSE}
+home_attendance_table_betting %>% 
+  mutate(Hawks = ifelse(Team == "Hawthorn", "H", "N")) %>% 
+  ggplot(aes(x=reorder(Team, -Underdog_impact), y= Underdog_impact, fill = Hawks)) +
+  geom_col() +
+  geom_text(aes(label = percent(Underdog_impact)), hjust = 0) +
+  scale_fill_manual(values = c("steelblue", "lightgrey")) +
+  ggtitle("Underdog Impact") +
+  coord_flip() +
+  theme(panel.grid.major.x = element_line(linetype = 2, colour = "lightgrey"), legend.position = "none", 
+        axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
+```
+
+
+## Favourite Impact
+
+Wow... Ok this doesn't look great. Hawthorn's median attendance when favourite is over 45% higher than their overall home attendance since 2013. Geelong's, just over 40%, is also abnormally high.
+
+```{r, warning=FALSE, message=FALSE}
+home_attendance_table_betting %>% 
+  mutate(Hawks = ifelse(Team == "Hawthorn", "H", "N")) %>%
+  ggplot(aes(x=reorder(Team, Favourite_impact), y= Favourite_impact, fill = Hawks)) +
+  geom_col() +
+  geom_text(aes(label = percent(Favourite_impact)), hjust = 0) +
+  scale_fill_manual(values = c("steelblue", "lightgrey")) +
+  ggtitle("Favourite Impact") +
+  coord_flip() +
+  theme(panel.grid.major.x = element_line(linetype = 2, colour = "lightgrey"), legend.position = "none", 
+        axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
+
+```
+
+
+Well, that didn't work out how I expected. Rather than busting the myth that Hawthorn fans are the biggest bandwagon jumpers ni the league, I've actually added to the argument.
+
+
+Stay tuned for part two of this series, where I will attempt to build a predictive model that predicts AFL attendances.
+
+Feel free to leave any feedback / corrections / etc in the comments or get in touch via [LinkedIn]().
 
 
 
