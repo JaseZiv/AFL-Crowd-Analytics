@@ -4,7 +4,7 @@ This project was created to build a machine learning model to predict Australian
 
 Two articles have been posted to Medium:
 
-* Article 1
+* [Using Data To Determine Which AFL Fans Jump On The Bandwagon](https://medium.com/@jaseziv83/using-data-to-determine-which-afl-fans-jump-on-the-bandwagon-8adbcc4160b0?sk=b4c0788b1f54aca1cfd50e2766eadd5c)
 * Article 2
 
 Data used was scraped from [afltables.com](https://afltables.com/) and bettng data files were downloaded from the [Austrailan Sports Betting](http://www.aussportsbetting.com/) website.

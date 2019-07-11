@@ -18,7 +18,7 @@ knitr::opts_chunk$set(echo = FALSE)
 
 # Introduction
 
-This post is the first in a two-part series on AFL crowds. This analysis will be a thorough look at AFL crowd numbers over the last 20 years, and will aim at discovering whose teams fans are the biggest bandwagon jumpers. *Bandwagon Jumpers* are those fans that are the loudest in the office or in your friendship group when things are going well, and the quietest when their team is losing. The analysis will use two questions to answer this:
+This post is the first in a two-part series on AFL crowds. This analysis will be a thorough look at AFL crowd numbers over the last 20 years, and will aim to discover which team’s fans are the biggest bandwagon jumpers. *Bandwagon Jumpers* are those fans that are the loudest in the office or in your friendship group when things are going well, and the quietest when their team is losing. The analysis will use two questions to answer this:
 
 1. Which team's home attendance is affected more because of the previous week's performance
     a. Here I will introduce three new metrics to measure this effect
@@ -74,7 +74,7 @@ afl %>%
 # ggsave("plots/crowd_hist.png", width = 30, height = 22, units = "cm")
 ```
 
-Thankfully for the AFL, the finals series at the end of the season draws larger crowds than the premiership (regular season for non-AFL fans) season. The median attendance for the premiership season is just over 33,000, while for finals it is over 58,000. The finals series are the flagship games for the AFL - they would hope these games would draw larger crowds. 
+As expected for the AFL, the finals series at the end of the season draws larger crowds than the premiership (regular season for non-AFL fans) season. The median attendance for the premiership season is just over 33,000, while for finals it is over 58,000. The finals series are the flagship games for the AFL - they would hope these games would draw larger crowds. 
 
 ```{r, warning=FALSE, message=FALSE}
 afl %>% 
@@ -82,10 +82,10 @@ afl %>%
   ggplot(aes(x= is_finals, y= attendance)) +
   geom_boxplot(colour = "midnightblue", fill = "steelblue") +
   scale_y_continuous(labels = comma, name = "Attendance") +
-  ggtitle("FINALS DRAW LARGER CROWDS... THANKFULLY") +
+  ggtitle("FINALS DRAW LARGER CROWDS") +
   theme(axis.title.x = element_blank(), panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
 
-# ggsave("plots/finals_reg_boxplot.png", width = 30, height = 22, units = "cm")
+ggsave("plots/finals_reg_boxplot.png", width = 30, height = 22, units = "cm")
 ```
 
 We can't glean a lot from finals since they're well patronised irrespective of who's playing, so the rest of the analysis will focus on the premiership season.
