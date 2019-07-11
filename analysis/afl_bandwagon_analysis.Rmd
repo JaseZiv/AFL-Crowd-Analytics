@@ -1,5 +1,5 @@
 ---
-title: "Jumping on the Bandwagon"
+title: "Using Data To Determine Which AFL Fans Jump On The Bandwagon"
 output:
   html_document:
     code_folding: hide
@@ -22,15 +22,15 @@ This post is the first in a two-part series on AFL crowds. This analysis will be
 
 1. Which team's home attendance is affected more because of the previous week's performance
     a. Here I will introduce three new metrics to measure this effect
-2. Does the chance the betting markets give their team to win affect a team's home attendance
+2. Does a team’s betting odds affect home attendance
 
 People all have their theories on which team's fans are the worst offending bandwagoners; this analysis will try to answer it once and for all! Also, sefishly, I'm sick of people telling me that fans of my team - the Hawthorn Hawks (a team that has experienced tremendous success over the last 10 years) are the worst offenders.
 
 
 ## The Data
-Data was collected from a few different online sources. The game and attendance data was sourced from the amazing [AFL Tables](https://afltables.com), while the betting data was sourced from the [Australian Sports Betting](http://www.aussportsbetting.com) website. 
+Data was collected from a few different online sources. The game and attendance data was sourced using the [rvest](https://github.com/tidyverse/rvest) package from the amazing [AFL Tables](https://afltables.com), while the betting data was sourced from the [Australian Sports Betting](http://www.aussportsbetting.com) website. 
 
-All the code and data for this project is available on [GitHub](https://github.com/JaseZiv/AFL-Crowd-Analytics)
+All the code and data for this project is available on [GitHub](https://github.com/JaseZiv/AFL-Crowd-Analytics). The [Tidyverse](https://www.tidyverse.org/) suite of packages features heavily throughout.
 
 The data is current to round 16 of the 2019 season.
 
@@ -70,6 +70,8 @@ afl %>%
   geom_text(aes(label = paste0("Median Crowd: ", comma(median(afl$attendance))), x= median(afl$attendance) + 15000), y= 350, colour = "darkred") +
   ylim(0,400) +
   theme(panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
+
+# ggsave("plots/crowd_hist.png", width = 30, height = 22, units = "cm")
 ```
 
 Thankfully for the AFL, the finals series at the end of the season draws larger crowds than the premiership (regular season for non-AFL fans) season. The median attendance for the premiership season is just over 33,000, while for finals it is over 58,000. The finals series are the flagship games for the AFL - they would hope these games would draw larger crowds. 
@@ -82,12 +84,14 @@ afl %>%
   scale_y_continuous(labels = comma, name = "Attendance") +
   ggtitle("FINALS DRAW LARGER CROWDS... THANKFULLY") +
   theme(axis.title.x = element_blank(), panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
+
+# ggsave("plots/finals_reg_boxplot.png", width = 30, height = 22, units = "cm")
 ```
 
-The rest of the analysis will only focus on the premiership season.
+We can't glean a lot from finals since they're well patronised irrespective of who's playing, so the rest of the analysis will focus on the premiership season.
 
 
-The last 20 seasons have seen some peaks and throughs though, with median attendances ranging from just under 29,000 in 2012 to just over 36,800 in 2008. The low attendances in 2012-13 was no doubt fuelled by the introduction of the newest expansion teams - Gold Coast and Greater Western Sydney (GWS) - in regions that are traditionally not AFL strongholds. The last five years however have seen a rebound of sorts, as these clubs slowly build up fanbases (and in the case of GWS start to have some success).
+The last 20 seasons have seen some peaks and throughs though, with median attendances ranging from just under 29,000 in 2012 to just over 36,800 in 2008. The low attendances in 2012-13 were no doubt fuelled by the introduction of the newest expansion teams - Gold Coast and Greater Western Sydney (GWS) - in regions that are traditionally not AFL strongholds. The last five years however have seen a rebound of sorts, as these clubs slowly build up fanbases (and in the case of GWS start to have some success).
 
 ```{r, warning=FALSE, message=FALSE}
 afl_premiership_season %>% 
@@ -99,8 +103,10 @@ afl_premiership_season %>%
   geom_point() +
   labs(x= "Season", y= "Median\nAttendance", title = "PREMIERSHIP SEASON MEDIAN ATTENDANCES", subtitle = "Current 2019 season excluded") +
   scale_y_continuous(labels = comma) +
-  annotate("text", x=2013, y= 28500, label = "The introduction of Gold Coast and GWS\nreally hurt attendances in 2012/13") +
-  theme(plot.subtitle = element_text(colour = "darkred"))
+  annotate("text", x=2013, y= 28500, label = "The introduction of Gold Coast and GWS\nreally hurt average attendances in 2012/13") +
+  theme(plot.subtitle = element_text(colour = "darkred"), panel.grid.major.y = element_line(linetype = 2, colour = "lightgrey"))
+
+# ggsave("plots/crowds_seasons.png", width = 30, height = 22, units = "cm")
 ```
 
 
@@ -112,13 +118,15 @@ Well this post won't be able to answer that question. What it can answer is whic
 
 There are seven teams that have had above average crowds since the 2000 season:
 
-* Adelaide
-* Carlton
+
 * Collingwood
 * Essendon
-* Hawthorn
 * Richmond
+* Adelaide
+* Carlton
 * West Coast
+* Hawthorn
+
 
 Four of those clubs are Victorian clubs, with the other two from South Australia and Western Australia. This is important to note that even though the AFL is a national competition, these three states are traditionally stronghold states. Brisbane - despite their extreme success in the early part of this century and the fact that a Victorian club merged with then (Fitzroy Lions) - have the third lowest attendances. Only recent expansion teams GWS and Gold Coast have lower attendances. The north-east states are clearly a problem for the league.
 
@@ -147,7 +155,8 @@ team_attendances %>%
   scale_fill_manual(values = c("steelblue", "lightgrey")) +
   ggtitle("ATTENDANCES FOR EACH TEAM OVER THE LAST 20 YEARS") +
   theme(axis.title.y = element_blank(), legend.position = "none")
-  
+
+# ggsave("plots/team_attendance_box.png", width = 30, height = 22, units = "cm")
 ```
 
 
@@ -182,8 +191,9 @@ team_attendances %>%
   scale_y_continuous(labels = comma) +
   ggtitle("SOME VARIANCE BETWEEN HOME TEAM ATTENDANCE AFTER WINS AND LOSSES") +
   facet_wrap(~ Team, scales = "free", labeller = label_wrap_gen(), ncol = 6) +
-  theme(legend.position = "none", strip.text = element_text(size = 12, face = "bold"), strip.background = element_rect(color="black", fill="#FFFFCC", size=1.5, linetype="solid"), axis.title.x = element_blank(), axis.title.y = element_blank())
+  theme(legend.position = "none", strip.text = element_text(size = 10, face = "bold"), strip.background = element_rect(color="black", size=1.5, linetype="solid"), axis.title.x = element_blank(), axis.title.y = element_blank())
 
+# ggsave("plots/home_win_loss_crowds.png", width = 40, height = 22, units = "cm")
 ```
 
 
@@ -201,7 +211,7 @@ Again, Geelong fans have the best WIoA at less than half a percent, while Gold C
 
 ## Overall Performance Impact
 
-Calculating the difference between the two measures give an overall indicator of fan senstitvity to their team's last performanmce. I hate to say it, but Hawthorn fans top this list with an OPI of 22.2%, just edging out St Kilda on 22.0%. Melbourne and GWS are at around the 18% mark, while North, Richmond, Collingwood and Carlton in the 16-17% range.
+Calculating the difference between the two measures give an overall indicator of fan senstitvity to their team's last performance. I hate to say it, but Hawthorn fans top this list with an OPI of 22.2%, just edging out St Kilda on 22.0%. Melbourne and GWS are at around the 18% mark, while North, Richmond, Collingwood and Carlton in the 16-17% range.
 
 This pains me to say, but Geelong fans are the most consistent set of fans with an OPI of 1.1% Gold Coast, Adelaide and Essendon supporters are also fairly consistent in their attendance.
 
@@ -235,7 +245,7 @@ home_attendance_table %>%
 
 
 
-# Does the chance the betting markets give their team to win affect a team's home attendance?
+# Does a team’s betting odds affect home attendance?
 
 To answer this question, betting data was collected from the [Australian Sports Betting](http://www.aussportsbetting.com) website.
 
@@ -305,6 +315,8 @@ home_attendance_table_betting %>%
   coord_flip() +
   theme(panel.grid.major.x = element_line(linetype = 2, colour = "lightgrey"), legend.position = "none", 
         axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
+
+# ggsave("plots/underdog.png", width = 30, height = 22, units = "cm")
 ```
 
 
@@ -324,15 +336,15 @@ home_attendance_table_betting %>%
   theme(panel.grid.major.x = element_line(linetype = 2, colour = "lightgrey"), legend.position = "none", 
         axis.title.x = element_blank(), axis.text.x = element_blank(), axis.title.y = element_blank())
 
+# ggsave("plots/favourite.png", width = 30, height = 22, units = "cm")
 ```
 
 
-Well, that didn't work out how I expected. Rather than busting the myth that Hawthorn fans are the biggest bandwagon jumpers ni the league, I've actually added to the argument.
-
+Well, that didn't work out how I expected. Rather than busting the myth that Hawthorn fans are the biggest bandwagon jumpers in the league, I've actually added to the argument.
 
 Stay tuned for part two of this series, where I will attempt to build a predictive model that predicts AFL attendances.
 
-Feel free to leave any feedback / corrections / etc in the comments or get in touch via [LinkedIn](https://www.linkedin.com/in/jason-zivkovic-4a0a1926/).
+Feel free to leave any feedback / corrections / etc in the comments or get in [touch](https://www.linkedin.com/in/jason-zivkovic-4a0a1926/).
 
 
 
