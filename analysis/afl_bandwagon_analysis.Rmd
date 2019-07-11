@@ -332,7 +332,7 @@ Well, that didn't work out how I expected. Rather than busting the myth that Haw
 
 Stay tuned for part two of this series, where I will attempt to build a predictive model that predicts AFL attendances.
 
-Feel free to leave any feedback / corrections / etc in the comments or get in touch via [LinkedIn]().
+Feel free to leave any feedback / corrections / etc in the comments or get in touch via [LinkedIn](https://www.linkedin.com/in/jason-zivkovic-4a0a1926/).
 
 
 
