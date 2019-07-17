@@ -1,9 +1,9 @@
 library(dplyr)
 library(rvest)
+library(lubridate)
 
-# obs_code <- 136
-# station <- 86038
 
+# Function to download zip folders ----------------------------------------
 
 download_obs_file <- function(station, obs_code) {
   tmppath <- paste0(obs_code, "_", station, ".zip")
@@ -32,6 +32,8 @@ download_obs_file <- function(station, obs_code) {
 }
 
 
+
+# Function to process each weather station --------------------------------
 
 process_file <- function(filename, years) {
   temp_dir <- tempdir()
@@ -85,16 +87,40 @@ process_file <- function(filename, years) {
 
 # Extractions -------------------------------------------------------------
 # stations <- c(86038, 40764)
-years <- c(2000:2019)
+years <- c(1999:2019)
 
-stations <-c(23090) #086232
+stations <- c(023090, 040913, 040849, 087184, 086232, 009225, 066062, 096046)
 
 tmp_paths <- lapply(stations, download_obs_file, obs_code = 136)
 df <- lapply(dir(pattern = "136_([0-9]{4,5}).zip"), process_file, years = years)
-data_rain <- do.call("rbind", df)
-data_rain <- data_rain[data_rain$Year != 0, ]
+rain_data <- do.call("rbind", df)
+rain_data <- data_rain[data_rain$Year != 0, ]
 rm(df)
 unlink(tmp_paths)
+
+
+
+# Preprocessing -----------------------------------------------------------
+
+# because the date the rainfall is recorded on is the day after the actual rainfall, a variable is needed that assigns the
+# weather reading to the previous day's record. Use dplyr::lead() for this
+rain_data <- rain_data %>% 
+  arrange(Bureau.of.Meteorology.station.number, Year, Month, Day) %>% 
+  group_by(Bureau.of.Meteorology.station.number) %>% 
+  mutate(actual_days_rain = lead(rainfall_clean)) %>% ungroup()
+
+
+# combine the individual fields into one date field, convert to date field using lubridate::ymd()
+rain_data <- rain_data %>% unite("weather_date", c("Year", "Month", "Day"), sep = "-")
+rain_data$weather_date <- ymd(rain_data$weather_date)
+
+# filter out only required data
+rain_data <- rain_data %>% filter(weather_date >= '2000-01-01')
+
+write.csv(rain_data, "data/cleaned_data/preprocessed_rain_data.csv", row.names = F)
+
+
+
 
 
 
