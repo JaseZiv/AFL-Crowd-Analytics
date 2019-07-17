@@ -43,6 +43,34 @@ process_file <- function(filename, years) {
     # read csv
     df <- read.csv(datafilename)
     df <- df[df$Year %in% years, 2:8]
+    
+
+  # Clean up missing rainfall data ------------------------------------------
+    vector <- df$Rainfall.amount..millimetres. %>% rev # the following look works in reverse, hence reversing the current rainfall vector
+    for (i in 1:length(vector)) {
+      
+      if(i == 1 & is.na(vector[i])) {
+        vector[i] <- mean(vector, na.rm=TRUE) # if the first observation extracted is missing, impute the overall average rainfall for the perid extracted. Should be rare that that's the case
+      } else { if(vector[i] %>% is.na(.)) {
+        total_rainfall <- vector[i-1] # get the rainfall value for the previous day that wasn't missing 
+        
+        
+        is_it_na_vector <- c()
+        for(j in 1:(length(vector)-i+1)) {
+          is_it_na_vector <- c(is_it_na_vector, is.na(vector[j+i - 1]))
+          if(!is_it_na_vector[j]) {break} # look for all of the remaining values until a non-NA is found
+        }
+        
+        consec_nas <- sum(is_it_na_vector) # count how many missing days there are in the sequence
+        
+        vector[(i-1):(i-1+consec_nas)] <- total_rainfall/(consec_nas + 1) # then divide the next recorded rainfall amount and disperse over this day and all missing days before it in the sequence
+        
+      } # End if
+      } # End else 
+      
+    }
+    df$rainfall_clean <- vector %>% rev # reverse it back again so it's back to the correct order
+    
   } else {
     df <- 0
   }
@@ -54,10 +82,10 @@ process_file <- function(filename, years) {
 
 
 # Extractions -------------------------------------------------------------
-stations <- c(86038, 40764)
-years <- c(2017:2019)
+# stations <- c(86038, 40764)
+years <- c(2000:2019)
 
-stations <- 086232
+stations <-c(23090) #086232
 
 tmp_paths <- lapply(stations, download_obs_file, obs_code = 136)
 df <- lapply(dir(pattern = "136_([0-9]{4,5}).zip"), process_file, years = years)
@@ -65,4 +93,5 @@ data_rain <- do.call("rbind", df)
 data_rain <- data_rain[data_rain$Year != 0, ]
 rm(df)
 unlink(tmp_paths)
+
 
