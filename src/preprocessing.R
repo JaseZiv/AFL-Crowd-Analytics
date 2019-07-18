@@ -82,8 +82,8 @@ all_data_cleaned <- all_data_cleaned %>%
          winner = ifelse(team1_score > team2_score, "Home", ifelse(team2_score > team1_score, "Away", "Draw"))) 
 
 
-VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Hobart")
 venue <- all_data_cleaned %>% count(venue) %>% pull(venue)
+VenueCity <- c("Adelaide", "Hobart", "Sydney", "Gold Coast", "Cairns", "Melbourne", "Ballarat", "Adelaide", "Brisbane", "China", "Geelong", "Melbourne", "Canberra", "Darwin", "Perth", "Melbourne", "Gold Coast", "Sydney", "Sydney", "Perth", "Sydney", "Darwin", "Perth", "NZ", "Launceston")
 
 venues_df <- cbind(venue, VenueCity) %>% data.frame() %>% mutate_if(is.factor, as.character)
 
@@ -94,33 +94,23 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(venues_df, by = "venue")
 
 
-# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# # Read in Rain Data -------------------------------------------------------
-# #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# 
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Read in Rain Data -------------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 # rain_data <- read.csv("data/cleaned_data/preprocessed_rain_data.csv", stringsAsFactors = F) %>% data.frame()
-# 
-# 
-# rain_data$location[rain_data$location == "adl"] <- "Adelaide"
-# rain_data$location[rain_data$location == "brs"] <- "Brisbane"
-# rain_data$location[rain_data$location == "gc"] <- "Gold Coast"
-# rain_data$location[rain_data$location == "melb"] <- "Melbourne"
-# rain_data$location[rain_data$location == "perth"] <- "Perth"
-# rain_data$location[rain_data$location == "syd"] <- "Sydney"
-# rain_data$location[rain_data$location == "tas"] <- "Hobart"
-# rain_data$location[rain_data$location == "gee"] <- "Geelong"
-# 
-# 
-# # select only required variables
-# rain_data <- rain_data %>% 
-#   select(weather_date, rainfall_ml = `Rainfall.amount..millimetres.`, days_rainfall_measured = `Period.over.which.rainfall.was.measured..days.`, Quality, VenueCity = location, actual_days_rain)
-# 
-# # ensure date variable in weather data is Date type
-# rain_data <- rain_data %>% mutate(weather_date = ymd(weather_date))
-# 
-# # Join back to main df
-# all_data_cleaned <- all_data_cleaned %>% 
-#   left_join(rain_data, by = c("date" = "weather_date", "VenueCity"))
+weather_data <- read.csv("data/cleaned_data/preprocessed_rain_temp_data.csv", stringsAsFactors = F) %>% data.frame()
+
+# select only required variables
+weather_data <- weather_data %>%
+  select(station = Bureau.of.Meteorology.station.number.x, weather_date, rainfall_clean, actual_days_rain, VenueCity = cities, min_temp, max_temp)
+
+# ensure date variable in weather data is Date type
+weather_data <- weather_data %>% mutate(weather_date = ymd(weather_date))
+
+# Join back to main df
+all_data_cleaned <- all_data_cleaned %>%
+  left_join(weather_data, by = c("date" = "weather_date", "VenueCity"))
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -168,7 +158,6 @@ all_data_cleaned <- all_data_cleaned %>%
 # calculate the odds differences, if it rained or not, and whether the home team is the favourite
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
-         # rain = ifelse(actual_days_rain > 2, "Yes", "No"),
          HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
 
 weeknight_games <- c("Mon", "Tue", "Wed")
