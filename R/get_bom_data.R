@@ -1,6 +1,7 @@
-library(dplyr)
+library(tidyverse)
 library(rvest)
 library(lubridate)
+
 
 
 # Function to download zip folders ----------------------------------------
@@ -85,16 +86,16 @@ process_file <- function(filename, years) {
 }
 
 
-# Extractions -------------------------------------------------------------
+# Rain Extractions --------------------------------------------------------
 # stations <- c(86038, 40764)
 years <- c(1999:2019)
 
-stations <- c(023090, 040913, 040849, 087184, 086232, 009225, 066062, 096046)
+stations <- c(023090, 087014, 040913, 031011, 070247, 014015, 040846, 087113, 086232, 009225, 066062, 094029, 091237)
 
 tmp_paths <- lapply(stations, download_obs_file, obs_code = 136)
 df <- lapply(dir(pattern = "136_([0-9]{4,5}).zip"), process_file, years = years)
 rain_data <- do.call("rbind", df)
-rain_data <- data_rain[data_rain$Year != 0, ]
+rain_data <- rain_data[rain_data$Year != 0, ]
 rm(df)
 unlink(tmp_paths)
 
@@ -114,13 +115,72 @@ rain_data <- rain_data %>%
 rain_data <- rain_data %>% unite("weather_date", c("Year", "Month", "Day"), sep = "-")
 rain_data$weather_date <- ymd(rain_data$weather_date)
 
-# filter out only required data
-rain_data <- rain_data %>% filter(weather_date >= '2000-01-01')
 
+
+# put city names against each weather station
+stations <- c(023090, 087014, 040913, 031011, 070247, 014015, 040846, 087113, 086232, 009225, 066062, 094029, 091237)
+cities <- c("Adelaide", "Ballarat", "Brisbane", "Cairns", "Canberra", "Darwin", "Gold Coast", "Geelong", "Melbourne", "Perth", "Sydney", "Hobart", "Launceston")
+
+station_cities <- cbind(stations, cities) %>% data.frame() %>% mutate(stations = as.numeric(as.character(stations)), cities = as.character(cities))
+
+# join it to the main rain DF
+rain_data <- rain_data %>% left_join(station_cities, by = c("Bureau.of.Meteorology.station.number" = "stations"))
+
+# write file
 write.csv(rain_data, "data/cleaned_data/preprocessed_rain_data.csv", row.names = F)
 
 
 
+# Max Temp Extractions -----------------------------------------------------
+# stations <- c(86038, 40764)
+years <- c(1999:2019)
+
+temp_stations <- c(023090, 089002, 040913, 031011, 070351, 014015, 040764, 087113, 086068, 009225, 066062, 094029, 091237)
+temp_cities <- c("Adelaide", "Ballarat", "Brisbane", "Cairns", "Canberra", "Darwin", "Gold Coast", "Geelong", "Melbourne", "Perth", "Sydney", "Hobart", "Launceston")
+
+tmp_paths <- lapply(temp_stations, download_obs_file, obs_code = 122)
+df <- lapply(dir(pattern = "122_([0-9]{4,5}).zip"), process_file, years = years)
+max_temp_data <- do.call("rbind", df)
+max_temp_data <- max_temp_data[max_temp_data$Year != 0, ]
+rm(df)
+unlink(tmp_paths)
 
 
+# Min Temp Extractions -----------------------------------------------------
+# stations <- c(86038, 40764)
+years <- c(1999:2019)
+
+tmp_paths <- lapply(temp_stations, download_obs_file, obs_code = 123)
+df <- lapply(dir(pattern = "123_([0-9]{4,5}).zip"), process_file, years = years)
+min_temp_data <- do.call("rbind", df)
+min_temp_data <- min_temp_data[min_temp_data$Year != 0, ]
+rm(df)
+unlink(tmp_paths)
+
+
+temp_station_cities <- cbind(temp_stations, temp_cities) %>% data.frame() %>% mutate(temp_stations = as.numeric(as.character(temp_stations)), temp_cities = as.character(temp_cities))
+
+temperature_data <- min_temp_data %>% 
+  full_join(max_temp_data, by = c("Bureau.of.Meteorology.station.number", "Year", "Month", "Day")) %>% 
+  select(Bureau.of.Meteorology.station.number, Year, Month, Day, min_temp = Minimum.temperature..Degree.C., max_temp = Maximum.temperature..Degree.C.)
+
+
+
+
+# combine the individual fields into one date field, convert to date field using lubridate::ymd()
+temperature_data <- temperature_data %>% unite("weather_date", c("Year", "Month", "Day"), sep = "-")
+temperature_data$weather_date <- ymd(temperature_data$weather_date)
+
+
+
+# join it to the main rain DF
+temperature_data <- temperature_data %>% left_join(temp_station_cities, by = c("Bureau.of.Meteorology.station.number" = "temp_stations"))
+
+
+
+weather_data <- rain_data %>% 
+  full_join(temperature_data, by = c("weather_date", "cities" = "temp_cities"))
+
+# write file
+write.csv(weather_data, "data/cleaned_data/preprocessed_rain_temp_data.csv", row.names = F)
 
