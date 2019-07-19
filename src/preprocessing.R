@@ -108,6 +108,12 @@ weather_data <- weather_data %>%
 # ensure date variable in weather data is Date type
 weather_data <- weather_data %>% mutate(weather_date = ymd(weather_date))
 
+# calculate the last five days rain from each date
+weather_data <- weather_data %>% 
+  group_by(station) %>% 
+  mutate(last_five_days_rain = actual_days_rain + lag(actual_days_rain, 1) + lag(actual_days_rain, 2) + lag(actual_days_rain, 3)+ lag(actual_days_rain, 4)) %>% 
+  ungroup()
+
 # Join back to main df
 all_data_cleaned <- all_data_cleaned %>%
   left_join(weather_data, by = c("date" = "weather_date", "VenueCity"))
@@ -151,8 +157,8 @@ melbourne_rivals <- c("Carlton", "Collingwood", "Essendon", "Richomond")
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(rivalry_game = ifelse(team1 %in% c("West Coast", "Fremantle") & team2 %in% c("West Coast", "Fremantle"), "Rivalry",
                        ifelse(team1 %in% c("Adelaide", "Port Adelaide") & team2 %in% c("Adelaide", "Port Adelaide"), "Rivalry", 
-                              ifelse(team1 %in% c("Hawthorn", "Geelong") & team2 %in% c("Hawthorn", "Geelong"), "Rivalry",
-                                     ifelse(team1 %in% melbourne_rivals & team2 %in% melbourne_rivals, "Rivalry", "Normal")))))
+                              #ifelse(team1 %in% c("Hawthorn", "Geelong") & team2 %in% c("Hawthorn", "Geelong"), "Rivalry",
+                                     ifelse(team1 %in% melbourne_rivals & team2 %in% melbourne_rivals, "Rivalry", "Normal"))))
 
 
 # calculate the odds differences, if it rained or not, and whether the home team is the favourite
