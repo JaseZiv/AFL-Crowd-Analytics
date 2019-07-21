@@ -103,14 +103,14 @@ weather_data <- read.csv("data/cleaned_data/preprocessed_rain_temp_data.csv", st
 
 # select only required variables
 weather_data <- weather_data %>%
-  select(station = Bureau.of.Meteorology.station.number.x, weather_date, rainfall_clean, actual_days_rain, VenueCity = cities, min_temp, max_temp)
+  select(weather_date, rainfall_clean, actual_days_rain, VenueCity = cities, min_temp, max_temp)
 
 # ensure date variable in weather data is Date type
 weather_data <- weather_data %>% mutate(weather_date = ymd(weather_date))
 
 # calculate the last five days rain from each date
 weather_data <- weather_data %>% 
-  group_by(station) %>% 
+  group_by(VenueCity) %>% 
   mutate(last_five_days_rain = actual_days_rain + lag(actual_days_rain, 1) + lag(actual_days_rain, 2) + lag(actual_days_rain, 3)+ lag(actual_days_rain, 4)) %>% 
   ungroup()
 
