@@ -126,6 +126,8 @@ station_cities <- cbind(stations, cities) %>% data.frame() %>% mutate(stations =
 # join it to the main rain DF
 rain_data <- rain_data %>% left_join(station_cities, by = c("Bureau.of.Meteorology.station.number" = "stations"))
 
+rain_data <- rain_data %>% select(-Bureau.of.Meteorology.station.number)
+
 # write file
 write.csv(rain_data, "data/cleaned_data/preprocessed_rain_data.csv", row.names = F)
 
@@ -145,6 +147,12 @@ max_temp_data <- max_temp_data[max_temp_data$Year != 0, ]
 rm(df)
 unlink(tmp_paths)
 
+# Impute any missing maximum temperatues by taking the mean for that weatherstation and month.
+max_temp_data <- max_temp_data %>% 
+  group_by(Bureau.of.Meteorology.station.number, Month) %>% 
+  mutate(Maximum.temperature..Degree.C. = ifelse(is.na(Maximum.temperature..Degree.C.), mean(Maximum.temperature..Degree.C., na.rm = T), Maximum.temperature..Degree.C.)) %>% 
+  ungroup()
+
 
 # Min Temp Extractions -----------------------------------------------------
 # stations <- c(86038, 40764)
@@ -156,6 +164,11 @@ min_temp_data <- do.call("rbind", df)
 min_temp_data <- min_temp_data[min_temp_data$Year != 0, ]
 rm(df)
 unlink(tmp_paths)
+
+min_temp_data <- min_temp_data %>% 
+  group_by(Bureau.of.Meteorology.station.number, Month) %>% 
+  mutate(Minimum.temperature..Degree.C. = ifelse(is.na(Minimum.temperature..Degree.C.), mean(Minimum.temperature..Degree.C., na.rm = T), Minimum.temperature..Degree.C.)) %>% 
+  ungroup()
 
 
 temp_station_cities <- cbind(temp_stations, temp_cities) %>% data.frame() %>% mutate(temp_stations = as.numeric(as.character(temp_stations)), temp_cities = as.character(temp_cities))
@@ -176,8 +189,9 @@ temperature_data$weather_date <- ymd(temperature_data$weather_date)
 # join it to the main rain DF
 temperature_data <- temperature_data %>% left_join(temp_station_cities, by = c("Bureau.of.Meteorology.station.number" = "temp_stations"))
 
+temperature_data <- temperature_data %>% select(-Bureau.of.Meteorology.station.number)
 
-
+# join the temperature and rain datasets together
 weather_data <- rain_data %>% 
   full_join(temperature_data, by = c("weather_date", "cities" = "temp_cities"))
 
