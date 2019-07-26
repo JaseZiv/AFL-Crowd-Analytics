@@ -107,8 +107,7 @@ unlink(tmp_paths)
 # weather reading to the previous day's record. Use dplyr::lead() for this
 rain_data <- rain_data %>% 
   arrange(Bureau.of.Meteorology.station.number, Year, Month, Day) %>% 
-  group_by(Bureau.of.Meteorology.station.number) %>% 
-  mutate(actual_days_rain = lead(rainfall_clean)) %>% ungroup()
+  group_by(Bureau.of.Meteorology.station.number) %>% ungroup()
 
 
 # combine the individual fields into one date field, convert to date field using lubridate::ymd()
