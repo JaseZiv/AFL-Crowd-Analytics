@@ -103,15 +103,20 @@ weather_data <- read.csv("data/cleaned_data/preprocessed_rain_temp_data.csv", st
 
 # select only required variables
 weather_data <- weather_data %>%
-  select(weather_date, rainfall_clean, actual_days_rain, VenueCity = cities, min_temp, max_temp)
+  select(weather_date, rainfall_clean, VenueCity = cities, min_temp, max_temp)
 
 # ensure date variable in weather data is Date type
 weather_data <- weather_data %>% mutate(weather_date = ymd(weather_date))
 
+# there are a few Melbourne rain events not captured... will input them here manually
+weather_data <- weather_data %>% 
+  mutate(rainfall_clean = ifelse(VenueCity == "Melbourne" & weather_date == '2019-07-20', 0, rainfall_clean)) %>% 
+  mutate(rainfall_clean = ifelse(VenueCity == "Melbourne" & weather_date == '2019-07-21', 0, rainfall_clean))
+
 # calculate the last five days rain from each date
 weather_data <- weather_data %>% 
   group_by(VenueCity) %>% 
-  mutate(last_five_days_rain = actual_days_rain + lag(actual_days_rain, 1) + lag(actual_days_rain, 2) + lag(actual_days_rain, 3)+ lag(actual_days_rain, 4)) %>% 
+  mutate(last_five_days_rain = rainfall_clean + lag(rainfall_clean, 1) + lag(rainfall_clean, 2) + lag(rainfall_clean, 3)+ lag(rainfall_clean, 4)) %>% 
   ungroup()
 
 # Join back to main df
