@@ -221,15 +221,6 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(round_games %>% select(season, round, split_round), by = c("season", "round"))
 
 
-
-# Venues ------------------------------------------------------------------
-
-legitimate_venues <- c("M.C.G.", "Docklands", "Subiaco", "Football Park", "Gabba", "S.C.G.", "Kardinia Park", "Adelaide Oval", "Carrara", "York Park", "Sydney Showground", 
-                       "Stadium Australia", "Manuka Oval", "Perth Stadium", "Bellerive Oval")
-
-
-all_data_cleaned <- all_data_cleaned %>% mutate(venue = ifelse(venue %in% legitimate_venues, venue, "Other"))
-
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Save Data For Analysis --------------------------------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
