@@ -157,7 +157,6 @@ all_data_cleaned <- all_data_cleaned %>%
 # theses four Melbourne-based teams are traditional rivals - I will flag games played between them as rivalry games
 melbourne_rivals <- c("Carlton", "Collingwood", "Essendon", "Richomond")
 
-
 # also, the derby in bith SA and WA are fierce rivalries, as is Hawthorn v Geelong games
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(rivalry_game = ifelse(team1 %in% c("West Coast", "Fremantle") & team2 %in% c("West Coast", "Fremantle"), "Rivalry",
@@ -170,14 +169,6 @@ all_data_cleaned <- all_data_cleaned %>%
 all_data_cleaned <- all_data_cleaned %>% 
   mutate(odds_diff = abs(HomeOddsOpen - AwayOddsOpen),
          HomeTeamFav = ifelse(HomeOddsOpen > AwayOddsOpen, "Yes", "No"))
-
-weeknight_games <- c("Mon", "Tue", "Wed")
-
-# join the day of week the game is played and the time period it's played in
-all_data_cleaned <- all_data_cleaned %>% 
-  mutate(game_time = paste(weekday, time_period, sep = ' ')) %>%
-  mutate(game_time = ifelse(weekday %in% weeknight_games & time_period %in% c("Evening", "Night"), "Weeknight", game_time))
-
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -221,19 +212,295 @@ all_data_cleaned <- all_data_cleaned %>%
   left_join(round_games %>% select(season, round, split_round), by = c("season", "round"))
 
 
+
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Save Data For Analysis --------------------------------------------------
+# Rest of analysis for Premiership Season Only ----------------------------
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-write.csv(all_data_cleaned, "data/cleaned_data/afl_preprocessed.csv", row.names = F)
+
+# filter out finals rounds
+afl_premiership_season <- all_data_cleaned %>% filter(!str_detect(round, "Final"))
+
+
+# Feature for whether the team played finals last season ------------------
+# create DF of finals games only
+finals <- all_data_cleaned %>% filter(str_detect(round, "Final"))
+
+# convert to long DF
+played_finals_last_season <- finals %>% 
+  select(season, Team = team1) %>% 
+  rbind(
+    finals %>% select(season, Team = team2)
+  ) %>% 
+  distinct(.keep_all = T)
+
+played_finals_last_season <- played_finals_last_season %>% mutate(last_season = season + 1)
+
+rm(finals)
+
+# join finals feature to main DF, clean up column names
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(played_finals_last_season, by = c("season" = "last_season", "team1" = "Team"))
+
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(home_team_finals_last_season = ifelse(is.na(season.y), "No", "Yes")) %>% select(-season.y)
+
+
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(played_finals_last_season, by = c("season" = "last_season", "team2" = "Team"))
+
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(away_team_finals_last_season = ifelse(is.na(season.y), "No", "Yes")) %>% select(-season.y)
+
+
+
+# Feature to indicate which of the playing teams played finals last season --------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(finals_last_season = ifelse(home_team_finals_last_season == "Yes" & away_team_finals_last_season == "Yes", "both_played",
+                                     ifelse(home_team_finals_last_season == "Yes" & away_team_finals_last_season == "No", "home_only_played",
+                                            ifelse(home_team_finals_last_season == "No" & away_team_finals_last_season == "Yes", "away_only_played", "neither_played"))))
+
+
+
+# Feature for classifying game start times --------------------------------
+
+# because there is too many combinations of day of week, start times, etc, variables will be created to group these...ie weekday = Saturday, start time = 4pm, then "Sat Afternoon".
+# weekdays will be classed as "Weekday"
+weekend_days <- c("Fri", "Sat", "Sun")
+
+
+# feature engineering
+afl_premiership_season <- afl_premiership_season %>%
+  mutate(season_stage = ifelse(between(as.numeric(round), 1, 6), "First Quarter", ifelse(between(as.numeric(round), 7, 12), "Second Quarter", ifelse(between(as.numeric(round), 13, 18), "Third Quarter", "Last Quarter")))) %>%
+  mutate(time_period = ifelse(between(start_hour, 11, 15), "Afternoon", ifelse(between(start_hour, 16, 17), "Evening", "Night"))) %>%
+  mutate(weekday = ifelse(weekday %in% weekend_days, weekday, "Weekday")) %>% 
+  mutate(game_time = paste(weekday, time_period, sep = ' ')) %>%
+  mutate(game_month = month(date, label = T))
+
+
+# Feature for using min temp for night games and max temp for day games  --------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(temperature = ifelse(start_hour < 18, max_temp, min_temp))
+
+
+# Milestone games features ------------------------------------------------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(IsHomeMilestone = ifelse(home_milestone > 0 | home_300 > 0, "Yes", "No"),
+         IsAwayMilestone = ifelse(away_milestone > 0 | away_300 > 0, "Yes", "No"),
+         count_milestones = home_300 + home_milestone + away_300 + away_milestone)
+
+
+# Feature for last results of both teams ----------------------------------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(last_results = ifelse(team1_last_result == "Won" & team2_last_result == "Won", "both_won",
+                               ifelse(team1_last_result == "Lost" & team2_last_result == "Lost", "both_lost",
+                                      ifelse(team1_last_result == "Won" & team2_last_result == "Lost", "only_home_team_won",
+                                             ifelse(team1_last_result == "Lost" & team2_last_result == "Won", "only_away_team_won", "Other")))))
 
 
 
 
+# Feature for teams from same or diff states ------------------------------
+# create a dataframe of teams and the state they're from
+teams <- sort(unique(afl_premiership_season$team1))
+states <- c("SA", "QLD", "VIC", "VIC", "VIC", "WA", "VIC", "QLD", "NSW", "VIC", "VIC", "VIC", "SA", "VIC", "VIC", "NSW", "WA", "VIC")
+team_states <- data.frame(teams = teams, states = states) %>% mutate_all(as.character)
+
+# join team_states df to main DF and create feature
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(team_states, by = c("team1" = "teams")) %>% 
+  left_join(team_states, by = c("team2" = "teams")) %>% 
+  rename(home_team_state = states.x, away_team_state = states.y) %>% 
+  mutate(is_same_state = ifelse(home_team_state == away_team_state, "yes", "no"))
+
+
+# Feature for diff in min and max temps -----------------------------------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(temperature_diff = max_temp - min_temp)
 
 
 
+# Feature to calculate change in opening and closing odds -----------------
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(home_odds_change = HomeOddsClose - HomeOddsOpen,
+         away_odds_change = AwayOddsClose - AwayOddsOpen,
+         home_line_change = HomeLineClose - HomeLineOpen,
+         away_line_change = AwayLineClose - AwayLineOpen)
 
 
 
+# Feature for stadiums that are not primary AFL home grounds --------------
+secondary_venues <- c("Bellerive Oval", "Eureka Stadium", "Jiangwan Stadium", "Marrara Oval", "Riverway Stadium", "Stadium Australia", "Traeger Park", "Wellington", "York Park")
 
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(second_home_game = ifelse(venue %in% secondary_venues, "Yes", "No"))
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# function to create a ladder as at every round of every season
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+create_ladder <- function(afl_df) {
+  
+  # create a long df, with each observation being a team, for the round, for the season
+  team_view <- afl_premiership_season %>% 
+    select(Team = team1, round, season, winner, Score = team1_score, OppScore = team2_score) %>% 
+    mutate(round = as.numeric(round), home_or_away = "Home") %>%
+    bind_rows(afl_premiership_season %>% 
+                select(Team = team2, round, season, winner, Score = team2_score, OppScore = team1_score) %>% 
+                mutate(round = as.numeric(round), home_or_away = "Away"))  %>%
+    mutate(win = ifelse(winner == "Draw", 0.5, ifelse(winner == home_or_away, 1, 0))) %>% 
+    mutate(points = win * 4)
+  
+  
+  
+  # because there were byes throughout, some teams are missing for ladder construction purposes
+  # ie in some rounds, there aren't the right amount of teams in each round
+  df <- team_view %>%
+    distinct(season, Team) %>% 
+    left_join(team_view %>% 
+                distinct(season, round), by = "season") %>% 
+    left_join(team_view, by = c("season", "round", "Team")) %>% 
+    select(-winner, -home_or_away)
+  
+  
+  # function to replace the missing results (ie where the team had a bye) with zeros
+  replace_with_zero <- function(x){
+    if(is.na(x)) {x <- 0
+    } else {
+      x <- x
+    }
+  }
+  
+  # fill in the missing values with zeros
+  df <- df %>% 
+    mutate(Score = mapply(replace_with_zero, Score),
+           OppScore = mapply(replace_with_zero, OppScore),
+           win = mapply(replace_with_zero, win),
+           points = mapply(replace_with_zero, points))
+  
+  
+  # calculate cumulative scores for each team
+  df <- df %>% 
+    mutate(round = as.numeric(round)) %>% 
+    arrange(season, Team, round) %>% 
+    group_by(season, Team) %>% 
+    mutate(season_points = cumsum(points),
+           score_for = cumsum(Score),
+           score_against = cumsum(OppScore),
+           percentage = score_for / score_against) %>% ungroup()
+  
+  # Round 1 in 2011, Gold Coast had a bye in round 1, so need to fix the NaN for their percentage (R doesn't like 0 / 0)
+  df$percentage[is.nan(df$percentage)] <- 0
+  
+  # arrange teams so that the top ranked team is at the top
+  ladder <- df %>%
+    arrange(season, round, desc(season_points), desc(percentage))
+  
+  # apply the ladder position for each round. Because there were different numbers of teams each season, need to find out how many teams
+  for(i in unique(ladder$season)){
+    num_teams <- length(unique(ladder$Team[ladder$season == i]))
+    ladder$ladder_pos[ladder$season == i] <- rep(1:num_teams)
+  }
+  
+  return(ladder)
+}
+
+# create the ladder
+ladder <- create_ladder(afl_premiership_season)
+
+# because we will want to use the current week's ladder position for the following week's game, need to add 1 to the round variable
+ladder <- ladder %>% mutate(round = round + 1)
+
+# join ladder data for home team (team1)
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(ladder %>% 
+              select(season, Team, round, home_season_points = season_points, home_score_for = score_for, home_score_against = score_against, home_percentage = percentage, home_ladder_pos = ladder_pos) %>% 
+              mutate(round = as.character(round)), 
+            by = c('team1' = 'Team', 'season', 'round'))
+
+# join ladder data for away team (team2)
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(ladder %>% 
+              select(season, Team, round, away_season_points = season_points, away_score_for = score_for, away_score_against = score_against, away_percentage = percentage, away_ladder_pos = ladder_pos) %>% 
+              mutate(round = as.character(round)), 
+            by = c('team2' = 'Team', 'season', 'round'))
+
+
+
+# if there's NAs in the following colums (round 1 games), fill with a 1
+cols <- c("home_season_points", "home_score_for", "home_score_against", "home_percentage", "home_ladder_pos", "away_season_points", "away_score_for", "away_score_against", "away_percentage","away_ladder_pos")
+
+afl_premiership_season[, cols][is.na(afl_premiership_season[, cols])] <- 1
+
+# create a feature to determine if teams are in the top eight to use in model
+afl_premiership_season <- afl_premiership_season %>% 
+  mutate(teams_in_eight = ifelse(home_ladder_pos <= 8 & away_ladder_pos <= 8, "both",
+                                 ifelse(home_ladder_pos <= 8 & away_ladder_pos >= 8, "home_only",
+                                        ifelse(home_ladder_pos >= 8 & away_ladder_pos <= 8, "away_only", "neither"))))
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# function to create a DF to calculate the last three games record for each team
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+create_last_three_wins <- function(afl_df) {
+  # create a long df, with each observation being a team, for the round, for the season
+  team_view <- afl_premiership_season %>% 
+    select(Team = team1, round, season, winner) %>% 
+    mutate(round = as.numeric(round), home_or_away = "Home") %>%
+    bind_rows(afl_premiership_season %>% 
+                select(Team = team2, round, season, winner) %>% 
+                mutate(round = as.numeric(round), home_or_away = "Away"))  %>%
+    mutate(win = ifelse(winner == "Draw", 0.5, ifelse(winner == home_or_away, 1, 0)))
+  
+  
+  
+  # because there were byes throughout, some teams are missing for ladder construction purposes
+  # ie in some rounds, there aren't the right amount of teams in each round
+  df <- team_view %>%
+    distinct(season, Team) %>% 
+    left_join(team_view %>% 
+                distinct(season, round), by = "season") %>% 
+    left_join(team_view, by = c("season", "round", "Team")) %>% 
+    select(-winner, -home_or_away)
+  
+  
+  # fill in the missing values with zeros
+  df <- df %>% 
+    arrange(season, Team, as.numeric(round)) %>% 
+    group_by(season, Team) %>% 
+    mutate(win = ifelse(is.na(win), lag(win), win)) %>% 
+    # adelaide v geelong game cancelled for tragic circumstances. Each team was awarded the draw
+    mutate(win = ifelse(season == 2015 & round == 14 & Team %in% c("Geelong", "Adelaide"), 0.5, win)) %>% 
+    # Gold Coast's first possible game was a bye
+    mutate(win = ifelse(is.na(win), 0, win)) %>% 
+    mutate(wins_last_three = lag(win, 1) + lag(win, 2) + lag(win, 3)) %>% 
+    mutate(wins_last_three = ifelse(round == 1, 0, ifelse(round == 2, 0 + lag(win, 1), ifelse(round == 3, 0 + lag(win, 1) + lag(win, 2), lag(win, 1) + lag(win, 2) + lag(win, 3))))) %>% 
+    select(-win) %>% 
+    mutate(round = as.character(round)) %>% ungroup()
+  
+}
+
+# create the DF
+last_three <- create_last_three_wins(afl_premiership_season)
+
+# join the data for both home and away teams
+afl_premiership_season <- afl_premiership_season %>% 
+  left_join(last_three, by = c('team1' = 'Team', 'season', 'round')) %>% 
+  rename(home_wins_last_three = wins_last_three) %>% 
+  left_join(last_three, by = c('team2' = 'Team', 'season', 'round')) %>% 
+  rename(away_wins_last_three = wins_last_three)
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+# Feature for grouped stadiums --------------------------------------------
+# perfect multi-colinearity occurring on some stadiums, so the main stadiums will be kept in the venue variable, while the others classed as "Other"
+legit_venues <- c("Docklands", "M.C.G.", "Gabba", "S.C.G.", "Kardinia Park", "Adelaide Oval", "Carrara", "Sydney Showground", "Perth Stadium")
+
+afl_premiership_season <- afl_premiership_season %>%
+  mutate(venue = ifelse(venue %in% legit_venues, venue, "Other"))
+
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+# Save Data For Modelling -------------------------------------------------
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+write.csv(afl_premiership_season, "data/cleaned_data/afl_model_data.csv", row.names = F)
 
