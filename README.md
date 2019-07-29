@@ -5,7 +5,7 @@ This project was created to build a machine learning model to predict Australian
 Two articles have been posted to Medium:
 
 * [Using Data To Determine Which AFL Fans Jump On The Bandwagon](https://medium.com/@jaseziv83/using-data-to-determine-which-afl-fans-jump-on-the-bandwagon-8adbcc4160b0?sk=b4c0788b1f54aca1cfd50e2766eadd5c)
-* Article 2
+* [Building a Linear Regression Model in R to Predict AFL Crowds](https://medium.com/@jaseziv83/building-an-linear-regression-model-in-r-to-predict-afl-crowds-735b16a1f7c6)
 
 ## The Data
 Three sources of data were used in the project:
