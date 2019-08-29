@@ -7,6 +7,10 @@ library(tidyverse)
 afl_pre_19 <- read.csv("data/afl_games_pre2019.csv", stringsAsFactors = F)
 afl2019 <- read.csv("data/afl_games_2019.csv", stringsAsFactors = F)
 
+# remove standard deviation columns from afl_pre_2019 - wasn't scraped initially
+afl_pre_19 <- afl_pre_19 %>% 
+  select(-home_sd_experience, -away_sd_experience)
+
 # combine into one DF
 all_data <- rbind(afl_pre_19, afl2019) %>% data.frame()
 
